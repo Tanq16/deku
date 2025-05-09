@@ -17,21 +17,37 @@ document.addEventListener('DOMContentLoaded', function() {
     let showCompleted = false;
     
     // Initialize
-    loadTasks();
     initTheme();
+    loadTasks();
     
     // Event listeners
-    taskForm.addEventListener('submit', handleAddTask);
-    showCompletedCheckbox.addEventListener('change', toggleCompletedTasks);
-    toggleSidebarButton.addEventListener('click', toggleSidebar);
-    themeToggle.addEventListener('click', toggleTheme);
+    if (taskForm) {
+        taskForm.addEventListener('submit', handleAddTask);
+    }
+    
+    if (showCompletedCheckbox) {
+        showCompletedCheckbox.addEventListener('change', toggleCompletedTasks);
+    }
+    
+    if (toggleSidebarButton) {
+        toggleSidebarButton.addEventListener('click', toggleSidebar);
+    }
+    
+    if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+    }
     
     // Theme functions
     function initTheme() {
         const isDarkMode = localStorage.getItem('darkMode') === 'true';
         if (isDarkMode) {
             document.body.classList.add('dark-mode');
-            themeToggle.querySelector('i').classList.replace('fa-sun', 'fa-moon');
+            if (themeToggle) {
+                const icon = themeToggle.querySelector('i');
+                if (icon) {
+                    icon.classList.replace('fa-sun', 'fa-moon');
+                }
+            }
         }
     }
     
@@ -50,19 +66,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Task functions
     function loadTasks() {
+        console.log('Loading tasks...');
         fetch('/api/tasks')
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Tasks loaded:', data);
                 tasks = data;
                 renderTasks();
             })
-            .catch(error => console.error('Error loading tasks:', error));
+            .catch(error => {
+                console.error('Error loading tasks:', error);
+                showErrorMessage('Failed to load tasks. Please refresh the page.');
+            });
     }
     
     function renderTasks() {
+        if (!tasksList) return;
+        
+        console.log('Rendering tasks:', tasks);
         tasksList.innerHTML = '';
         
-        if (tasks.length === 0) {
+        if (!tasks || tasks.length === 0) {
             const emptyMessage = document.createElement('div');
             emptyMessage.className = 'placeholder-message';
             emptyMessage.innerHTML = '<p>No tasks yet. Add one above!</p>';
@@ -149,6 +178,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const text = taskInput.value.trim();
         const cycle = taskCycle.value;
         
+        console.log('Adding task:', text, cycle);
+        
         if (text) {
             addTask(text, cycle);
             taskInput.value = '';
@@ -156,24 +187,34 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function addTask(text, cycle) {
+        const data = JSON.stringify({ text, cycle });
+        console.log('Sending task data:', data);
+        
         fetch('/api/tasks', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ text, cycle })
+            body: data
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                console.error('Server response not OK:', response.status, response.statusText);
+                throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
             }
             return response.json();
         })
         .then(task => {
+            console.log('Task added successfully:', task);
+            // Add the new task to the array
             tasks.push(task);
+            // Re-render all tasks
             renderTasks();
         })
-        .catch(error => console.error('Error adding task:', error));
+        .catch(error => {
+            console.error('Error adding task:', error);
+            showErrorMessage('Failed to add task. Please try again.');
+        });
     }
     
     function showAddSubtaskForm(parentElement, parentId) {
@@ -208,20 +249,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function addSubtask(parentId, text, cycle) {
+        const data = JSON.stringify({ text, cycle });
+        console.log('Sending subtask data:', data);
+        
         fetch(`/api/tasks/${parentId}/subtask`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ text, cycle })
+            body: data
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
             }
             return response.json();
         })
         .then(subtask => {
+            console.log('Subtask added successfully:', subtask);
             // Find parent task and add subtask
             const parentTask = tasks.find(task => task.id === parentId);
             if (parentTask) {
@@ -232,10 +277,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderTasks();
             }
         })
-        .catch(error => console.error('Error adding subtask:', error));
+        .catch(error => {
+            console.error('Error adding subtask:', error);
+            showErrorMessage('Failed to add subtask. Please try again.');
+        });
     }
     
     function toggleTaskCompletion(id, completed) {
+        console.log('Toggling task completion:', id, completed);
+        
         fetch(`/api/tasks/${id}/status`, {
             method: 'PATCH',
             headers: {
@@ -245,13 +295,16 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
             }
             // Update task in local data
             updateTaskCompletionStatus(id, completed);
             renderTasks();
         })
-        .catch(error => console.error('Error updating task status:', error));
+        .catch(error => {
+            console.error('Error updating task status:', error);
+            showErrorMessage('Failed to update task status. Please try again.');
+        });
     }
     
     function updateTaskCompletionStatus(id, completed) {
@@ -279,18 +332,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function deleteTask(id) {
+        console.log('Deleting task:', id);
+        
         fetch(`/api/tasks/${id}`, {
             method: 'DELETE'
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
             }
             // Remove task from local data
             removeTaskFromLocalData(id);
             renderTasks();
         })
-        .catch(error => console.error('Error deleting task:', error));
+        .catch(error => {
+            console.error('Error deleting task:', error);
+            showErrorMessage('Failed to delete task. Please try again.');
+        });
     }
     
     function removeTaskFromLocalData(id) {
@@ -355,5 +413,10 @@ document.addEventListener('DOMContentLoaded', function() {
             case '3m': return 3 * monthMs;
             default: return 0;
         }
+    }
+    
+    function showErrorMessage(message) {
+        // You can implement a more sophisticated error notification here
+        alert(message);
     }
 });
