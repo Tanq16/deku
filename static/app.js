@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const showCompletedCheckbox = document.getElementById('show-completed-checkbox');
     const toggleSidebarButton = document.getElementById('toggle-sidebar');
     const sidebar = document.querySelector('.sidebar');
+    const themeToggle = document.getElementById('theme-toggle');
     
     // Templates
     const taskTemplate = document.getElementById('task-template');
@@ -17,13 +18,37 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize
     loadTasks();
+    initTheme();
     
     // Event listeners
     taskForm.addEventListener('submit', handleAddTask);
     showCompletedCheckbox.addEventListener('change', toggleCompletedTasks);
     toggleSidebarButton.addEventListener('click', toggleSidebar);
+    themeToggle.addEventListener('click', toggleTheme);
     
-    // Functions
+    // Theme functions
+    function initTheme() {
+        const isDarkMode = localStorage.getItem('darkMode') === 'true';
+        if (isDarkMode) {
+            document.body.classList.add('dark-mode');
+            themeToggle.querySelector('i').classList.replace('fa-sun', 'fa-moon');
+        }
+    }
+    
+    function toggleTheme() {
+        const isDarkMode = document.body.classList.toggle('dark-mode');
+        localStorage.setItem('darkMode', isDarkMode);
+        
+        // Toggle icon
+        const icon = themeToggle.querySelector('i');
+        if (isDarkMode) {
+            icon.classList.replace('fa-sun', 'fa-moon');
+        } else {
+            icon.classList.replace('fa-moon', 'fa-sun');
+        }
+    }
+    
+    // Task functions
     function loadTasks() {
         fetch('/api/tasks')
             .then(response => response.json())
@@ -36,6 +61,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function renderTasks() {
         tasksList.innerHTML = '';
+        
+        if (tasks.length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'placeholder-message';
+            emptyMessage.innerHTML = '<p>No tasks yet. Add one above!</p>';
+            tasksList.appendChild(emptyMessage);
+            return;
+        }
         
         tasks.forEach(task => {
             if (!showCompleted && task.completedAt !== null) {
@@ -130,7 +163,12 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({ text, cycle })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(task => {
             tasks.push(task);
             renderTasks();
@@ -177,7 +215,12 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({ text, cycle })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(subtask => {
             // Find parent task and add subtask
             const parentTask = tasks.find(task => task.id === parentId);
@@ -200,7 +243,10 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({ complete: completed })
         })
-        .then(() => {
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
             // Update task in local data
             updateTaskCompletionStatus(id, completed);
             renderTasks();
@@ -236,7 +282,10 @@ document.addEventListener('DOMContentLoaded', function() {
         fetch(`/api/tasks/${id}`, {
             method: 'DELETE'
         })
-        .then(() => {
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
             // Remove task from local data
             removeTaskFromLocalData(id);
             renderTasks();

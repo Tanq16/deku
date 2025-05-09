@@ -5,16 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 )
 
 //go:embed templates static
@@ -47,21 +48,29 @@ func NewTaskStore(dbPath string) (*TaskStore, error) {
 	// Create directory if it doesn't exist
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create directory: %v", err)
 	}
 
 	// Load existing tasks if file exists
 	if _, err := os.Stat(dbPath); err == nil {
 		data, err := os.ReadFile(dbPath)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read file: %v", err)
 		}
 
 		if len(data) > 0 {
 			if err := json.Unmarshal(data, &store); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to unmarshal JSON: %v", err)
 			}
 		}
+	} else if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("error checking file: %v", err)
+	} else {
+		// Create an empty file
+		if err := store.Save(); err != nil {
+			return nil, fmt.Errorf("failed to create initial file: %v", err)
+		}
+		log.Printf("Created new task store at %s", dbPath)
 	}
 
 	return store, nil
@@ -74,10 +83,15 @@ func (ts *TaskStore) Save() error {
 
 	data, err := json.MarshalIndent(ts, "", "  ")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal JSON: %v", err)
 	}
 
-	return os.WriteFile(ts.dbPath, data, 0644)
+	if err := os.WriteFile(ts.dbPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write file: %v", err)
+	}
+
+	log.Printf("Saved %d tasks to %s", len(ts.Tasks), ts.dbPath)
+	return nil
 }
 
 // AddTask adds a new task
@@ -93,7 +107,13 @@ func (ts *TaskStore) AddTask(text, cycle string) (*Task, error) {
 	}
 
 	ts.Tasks = append(ts.Tasks, task)
-	return task, ts.Save()
+	err := ts.Save()
+	if err != nil {
+		return nil, fmt.Errorf("failed to save task: %v", err)
+	}
+
+	log.Printf("Added new task: %s, ID: %s, Cycle: %s", text, task.ID, cycle)
+	return task, nil
 }
 
 // AddSubtask adds a subtask to a parent task
@@ -122,10 +142,16 @@ func (ts *TaskStore) AddSubtask(parentID, text, cycle string) (*Task, error) {
 	}
 
 	if !found {
-		return nil, fmt.Errorf("parent task not found")
+		return nil, fmt.Errorf("parent task not found: %s", parentID)
 	}
 
-	return subtask, ts.Save()
+	err := ts.Save()
+	if err != nil {
+		return nil, fmt.Errorf("failed to save subtask: %v", err)
+	}
+
+	log.Printf("Added new subtask: %s to parent %s", text, parentID)
+	return subtask, nil
 }
 
 // UpdateTaskStatus toggles task completion status
@@ -178,7 +204,7 @@ func (ts *TaskStore) UpdateTaskStatus(id string, complete bool) error {
 		}
 	}
 
-	return fmt.Errorf("task not found")
+	return fmt.Errorf("task not found: %s", id)
 }
 
 // DeleteTask removes a task
@@ -204,7 +230,7 @@ func (ts *TaskStore) DeleteTask(id string) error {
 		}
 	}
 
-	return fmt.Errorf("task not found")
+	return fmt.Errorf("task not found: %s", id)
 }
 
 // GetAllTasks returns all tasks sorted by completion status and creation time
@@ -229,15 +255,20 @@ func (ts *TaskStore) GetAllTasks() []*Task {
 	return tasksCopy
 }
 
-// Main application struct
+// App is the main application struct
 type App struct {
-	Router    *mux.Router
 	Templates *template.Template
 	Store     *TaskStore
 }
 
 func main() {
+	// Initialize logging
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.Println("Starting Deku Task Tracker...")
+
 	dbPath := "data/tasks.json"
+	log.Printf("Using database path: %s", dbPath)
+
 	store, err := NewTaskStore(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize task store: %v", err)
@@ -249,147 +280,216 @@ func main() {
 		log.Fatalf("Failed to parse templates: %v", err)
 	}
 
-	// Initialize router
-	router := mux.NewRouter()
-
 	app := &App{
-		Router:    router,
 		Templates: templates,
 		Store:     store,
 	}
 
-	// Static files
-	router.PathPrefix("/static/").Handler(http.FileServer(http.FS(content)))
+	// Static file server
+	http.Handle("/static/", http.FileServer(http.FS(content)))
 
-	// Routes
-	router.HandleFunc("/", app.HandleHome).Methods("GET")
-	router.HandleFunc("/kanban", app.HandleKanban).Methods("GET")
-	router.HandleFunc("/gantt", app.HandleGantt).Methods("GET")
-	router.HandleFunc("/calendar", app.HandleCalendar).Methods("GET")
+	// Page routes
+	http.HandleFunc("/", app.HandleHome)
+	http.HandleFunc("/kanban", app.HandleKanban)
+	http.HandleFunc("/gantt", app.HandleGantt)
+	http.HandleFunc("/calendar", app.HandleCalendar)
 
-	// API endpoints
-	router.HandleFunc("/api/tasks", app.HandleGetTasks).Methods("GET")
-	router.HandleFunc("/api/tasks", app.HandleAddTask).Methods("POST")
-	router.HandleFunc("/api/tasks/{id}/subtask", app.HandleAddSubtask).Methods("POST")
-	router.HandleFunc("/api/tasks/{id}/status", app.HandleUpdateTaskStatus).Methods("PATCH")
-	router.HandleFunc("/api/tasks/{id}", app.HandleDeleteTask).Methods("DELETE")
+	// API routes
+	http.HandleFunc("/api/tasks", app.HandleTasks)
+	http.HandleFunc("/api/tasks/", app.HandleTaskOperations)
 
 	// Start server
 	port := ":8080"
 	log.Printf("Server starting on port %s", port)
-	log.Fatal(http.ListenAndServe(port, router))
+	log.Fatal(http.ListenAndServe(port, nil))
 }
 
 // HandleHome renders the home page
 func (app *App) HandleHome(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
 	app.Templates.ExecuteTemplate(w, "home.html", nil)
 }
 
-// HandleKanban renders the kanban page (placeholder)
+// HandleKanban renders the kanban page
 func (app *App) HandleKanban(w http.ResponseWriter, r *http.Request) {
 	app.Templates.ExecuteTemplate(w, "kanban.html", nil)
 }
 
-// HandleGantt renders the gantt page (placeholder)
+// HandleGantt renders the gantt page
 func (app *App) HandleGantt(w http.ResponseWriter, r *http.Request) {
 	app.Templates.ExecuteTemplate(w, "gantt.html", nil)
 }
 
-// HandleCalendar renders the calendar page (placeholder)
+// HandleCalendar renders the calendar page
 func (app *App) HandleCalendar(w http.ResponseWriter, r *http.Request) {
 	app.Templates.ExecuteTemplate(w, "calendar.html", nil)
 }
 
-// API Handlers
+// HandleTasks handles GET (list all tasks) and POST (add new task) for /api/tasks
+func (app *App) HandleTasks(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		log.Println("GET /api/tasks - Fetching all tasks")
+		tasks := app.Store.GetAllTasks()
+		jsonResponse(w, tasks)
 
-// HandleGetTasks returns all tasks
-func (app *App) HandleGetTasks(w http.ResponseWriter, r *http.Request) {
-	tasks := app.Store.GetAllTasks()
-	jsonResponse(w, tasks)
+	case http.MethodPost:
+		log.Println("POST /api/tasks - Adding new task")
+
+		// Read the request body
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Printf("Error reading request body: %v", err)
+			http.Error(w, "Error reading request", http.StatusBadRequest)
+			return
+		}
+		defer r.Body.Close()
+
+		log.Printf("Request body: %s", string(body))
+
+		var requestData struct {
+			Text  string `json:"text"`
+			Cycle string `json:"cycle"`
+		}
+
+		if err := json.Unmarshal(body, &requestData); err != nil {
+			log.Printf("Error parsing JSON: %v", err)
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		log.Printf("Adding task: Text=%s, Cycle=%s", requestData.Text, requestData.Cycle)
+
+		task, err := app.Store.AddTask(requestData.Text, requestData.Cycle)
+		if err != nil {
+			log.Printf("Error adding task: %v", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		jsonResponse(w, task)
+
+	default:
+		log.Printf("Method not allowed: %s", r.Method)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
-// HandleAddTask adds a new task
-func (app *App) HandleAddTask(w http.ResponseWriter, r *http.Request) {
-	var requestData struct {
-		Text  string `json:"text"`
-		Cycle string `json:"cycle"`
-	}
+// HandleTaskOperations handles operations on specific tasks
+func (app *App) HandleTaskOperations(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
+	parts := strings.Split(path, "/")
 
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	log.Printf("Task operation: %s %s", r.Method, r.URL.Path)
+
+	if len(parts) < 1 {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
 		return
 	}
 
-	task, err := app.Store.AddTask(requestData.Text, requestData.Cycle)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	taskID := parts[0]
+
+	// Handle different operations based on URL and method
+	if len(parts) == 1 {
+		// /api/tasks/{id} - DELETE
+		if r.Method == http.MethodDelete {
+			log.Printf("DELETE /api/tasks/%s", taskID)
+			if err := app.Store.DeleteTask(taskID); err != nil {
+				log.Printf("Error deleting task: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+	} else if len(parts) == 2 {
+		if parts[1] == "subtask" && r.Method == http.MethodPost {
+			// /api/tasks/{id}/subtask - POST
+			log.Printf("POST /api/tasks/%s/subtask", taskID)
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				log.Printf("Error reading request body: %v", err)
+				http.Error(w, "Error reading request", http.StatusBadRequest)
+				return
+			}
+			defer r.Body.Close()
+
+			log.Printf("Subtask request body: %s", string(body))
+
+			var requestData struct {
+				Text  string `json:"text"`
+				Cycle string `json:"cycle"`
+			}
+
+			if err := json.Unmarshal(body, &requestData); err != nil {
+				log.Printf("Error parsing subtask JSON: %v", err)
+				http.Error(w, "Invalid JSON", http.StatusBadRequest)
+				return
+			}
+
+			subtask, err := app.Store.AddSubtask(taskID, requestData.Text, requestData.Cycle)
+			if err != nil {
+				log.Printf("Error adding subtask: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			jsonResponse(w, subtask)
+			return
+		} else if parts[1] == "status" && r.Method == http.MethodPatch {
+			// /api/tasks/{id}/status - PATCH
+			log.Printf("PATCH /api/tasks/%s/status", taskID)
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				log.Printf("Error reading request body: %v", err)
+				http.Error(w, "Error reading request", http.StatusBadRequest)
+				return
+			}
+			defer r.Body.Close()
+
+			log.Printf("Status update request body: %s", string(body))
+
+			var requestData struct {
+				Complete bool `json:"complete"`
+			}
+
+			if err := json.Unmarshal(body, &requestData); err != nil {
+				log.Printf("Error parsing status JSON: %v", err)
+				http.Error(w, "Invalid JSON", http.StatusBadRequest)
+				return
+			}
+
+			if err := app.Store.UpdateTaskStatus(taskID, requestData.Complete); err != nil {
+				log.Printf("Error updating task status: %v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 	}
 
-	jsonResponse(w, task)
-}
-
-// HandleAddSubtask adds a subtask to a parent task
-func (app *App) HandleAddSubtask(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	parentID := vars["id"]
-
-	var requestData struct {
-		Text  string `json:"text"`
-		Cycle string `json:"cycle"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	subtask, err := app.Store.AddSubtask(parentID, requestData.Text, requestData.Cycle)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	jsonResponse(w, subtask)
-}
-
-// HandleUpdateTaskStatus updates a task's completion status
-func (app *App) HandleUpdateTaskStatus(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
-
-	var requestData struct {
-		Complete bool `json:"complete"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&requestData); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	if err := app.Store.UpdateTaskStatus(id, requestData.Complete); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-// HandleDeleteTask deletes a task
-func (app *App) HandleDeleteTask(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	id := vars["id"]
-
-	if err := app.Store.DeleteTask(id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	log.Printf("Method not allowed: %s %s", r.Method, r.URL.Path)
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
 // Helper function to send JSON responses
 func jsonResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Printf("Error marshaling JSON response: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Sending JSON response: %s", string(jsonData))
+	w.Write(jsonData)
 }
