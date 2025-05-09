@@ -1,8 +1,10 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -12,6 +14,9 @@ import (
 
 	"github.com/google/uuid"
 )
+
+//go:embed static templates
+var content embed.FS
 
 // CycleDurations maps cycle string values to time.Duration values
 var CycleDurations = map[string]time.Duration{
@@ -521,23 +526,33 @@ func main() {
 	http.HandleFunc("/api/subtask/delete", handleDeleteSubtask(store))
 	http.HandleFunc("/api/subtask/complete", handleCompleteSubtask(store))
 
-	// Serve static files
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	// Serve static files from embedded filesystem
+	staticFS, err := fs.Sub(content, "static")
+	if err != nil {
+		log.Fatalf("Failed to create static sub-filesystem: %v", err)
+	}
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 
 	// Serve HTML templates
-	http.HandleFunc("/", serveTemplate("templates/home.html"))
-	http.HandleFunc("/kanban", serveTemplate("templates/kanban.html"))
-	http.HandleFunc("/gantt", serveTemplate("templates/gantt.html"))
-	http.HandleFunc("/calendar", serveTemplate("templates/calendar.html"))
+	http.HandleFunc("/", serveEmbeddedTemplate("templates/home.html"))
+	http.HandleFunc("/kanban", serveEmbeddedTemplate("templates/kanban.html"))
+	http.HandleFunc("/gantt", serveEmbeddedTemplate("templates/gantt.html"))
+	http.HandleFunc("/calendar", serveEmbeddedTemplate("templates/calendar.html"))
 
 	// Start the server
 	log.Println("Server listening on port 8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-// Helper function to serve HTML templates
-func serveTemplate(templatePath string) http.HandlerFunc {
+// Helper function to serve HTML templates from embedded filesystem
+func serveEmbeddedTemplate(templatePath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, templatePath)
+		data, err := content.ReadFile(templatePath)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Could not read template file: %v", err), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(data)
 	}
 }

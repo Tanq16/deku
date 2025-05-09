@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Deku - Task Tracker</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" href="/static/logo.svg" type="image/svg+xml">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <div class="app-container">
         <nav class="sidebar">
             <div class="logo-container">
-                <img src="/static/logo.png" alt="Deku Logo" class="logo">
-                <h1>deku</h1>
+                <img src="/static/logo.svg" alt="Deku Logo" class="logo">
             </div>
             <ul class="nav-links">
                 <li class="active"><a href="/"><i class="fas fa-list"></i> Home</a></li>
@@ -30,7 +30,7 @@
                 <button id="toggle-sidebar" class="toggle-sidebar">
                     <i class="fas fa-bars"></i>
                 </button>
-                <h2>Tasks</h2>
+                <h2>Deku</h2>
                 <div class="show-completed">
                     <input type="checkbox" id="show-completed-checkbox">
                     <label for="show-completed-checkbox">Show Completed</label>
@@ -59,8 +59,11 @@
                 
                 <div class="tasks-container">
                     <ul id="tasks-list" class="tasks-list">
-                        <!-- Tasks will be loaded here dynamically -->
-                    </ul>
+                        <div class="empty-state loading">
+                          <i class="fas fa-spinner fa-spin"></i>
+                          <p>Loading tasks...</p>
+                        </div>
+                      </ul>
                 </div>
             </div>
         </main>
