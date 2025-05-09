@@ -9,10 +9,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const sidebar = document.querySelector('.sidebar');
     const themeToggle = document.getElementById('theme-toggle');
     
-    // Templates
-    const taskTemplate = document.getElementById('task-template');
-    const subtaskFormTemplate = document.getElementById('subtask-form-template');
-    
     let tasks = [];
     let showCompleted = false;
     
@@ -88,7 +84,6 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderTasks() {
         if (!tasksList) return;
         
-        console.log('Rendering tasks:', tasks);
         tasksList.innerHTML = '';
         
         if (!tasks || tasks.length === 0) {
@@ -124,97 +119,89 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function createTaskElement(task, isSubtask = false) {
-        const taskElement = document.importNode(taskTemplate.content, true).firstElementChild;
-        
-        // Set task data
+        // Create task element directly without using template
+        const taskElement = document.createElement('li');
+        taskElement.className = 'task-item';
         taskElement.dataset.id = task.id;
-        const taskText = taskElement.querySelector('.task-text');
-        const taskCycleSpan = taskElement.querySelector('.task-cycle');
-        const checkbox = taskElement.querySelector('.task-checkbox');
-        const addSubtaskBtn = taskElement.querySelector('.btn-add-subtask');
-        const deleteBtn = taskElement.querySelector('.btn-delete');
-        const overdueSpan = taskElement.querySelector('.task-overdue');
         
-        // Set task content
-        taskText.textContent = task.text;
-        
-        // Set cycle text
-        if (task.cycle) {
-            taskCycleSpan.textContent = task.cycle;
-        } else {
-            taskCycleSpan.remove();
-        }
-        
-        // Check if task is completed
         if (task.completedAt !== null) {
-            checkbox.checked = true;
             taskElement.classList.add('task-completed');
         }
         
-        // Check if task is overdue
-        if (task.cycle && !isTaskCompleted(task) && isTaskOverdue(task)) {
-            overdueSpan.classList.remove('hidden');
-        }
+        // Create task content container
+        const taskContent = document.createElement('div');
+        taskContent.className = 'task-content';
         
-        // Hide add subtask button for subtasks
-        if (isSubtask) {
-            addSubtaskBtn.remove();
-        }
+        // Create checkbox container
+        const checkboxContainer = document.createElement('div');
+        checkboxContainer.className = 'task-checkbox-container';
         
-        // Add event listeners
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'task-checkbox';
+        checkbox.checked = task.completedAt !== null;
         checkbox.addEventListener('change', () => toggleTaskCompletion(task.id, checkbox.checked));
-        deleteBtn.addEventListener('click', () => deleteTask(task.id));
+        
+        checkboxContainer.appendChild(checkbox);
+        
+        // Create task details
+        const taskDetails = document.createElement('div');
+        taskDetails.className = 'task-details';
+        
+        const taskText = document.createElement('span');
+        taskText.className = 'task-text';
+        taskText.textContent = task.text;
+        taskDetails.appendChild(taskText);
+        
+        if (task.cycle) {
+            const cycleSpan = document.createElement('span');
+            cycleSpan.className = 'task-cycle';
+            cycleSpan.textContent = task.cycle;
+            taskDetails.appendChild(cycleSpan);
+            
+            // Check if overdue
+            if (!isTaskCompleted(task) && isTaskOverdue(task)) {
+                const overdueSpan = document.createElement('span');
+                overdueSpan.className = 'task-overdue';
+                overdueSpan.textContent = 'Overdue';
+                taskDetails.appendChild(overdueSpan);
+            }
+        }
+        
+        // Create actions
+        const taskActions = document.createElement('div');
+        taskActions.className = 'task-actions';
         
         if (!isSubtask) {
+            const addSubtaskBtn = document.createElement('button');
+            addSubtaskBtn.className = 'btn-add-subtask';
+            addSubtaskBtn.title = 'Add Subtask';
+            addSubtaskBtn.innerHTML = '<i class="fas fa-plus-square"></i>';
             addSubtaskBtn.addEventListener('click', () => showAddSubtaskForm(taskElement, task.id));
+            taskActions.appendChild(addSubtaskBtn);
         }
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-delete';
+        deleteBtn.title = 'Delete Task';
+        deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+        deleteBtn.addEventListener('click', () => deleteTask(task.id));
+        taskActions.appendChild(deleteBtn);
+        
+        // Assemble task content
+        taskContent.appendChild(checkboxContainer);
+        taskContent.appendChild(taskDetails);
+        taskContent.appendChild(taskActions);
+        
+        // Add subtasks list container
+        const subtasksList = document.createElement('ul');
+        subtasksList.className = 'subtasks-list';
+        
+        // Assemble full task element
+        taskElement.appendChild(taskContent);
+        taskElement.appendChild(subtasksList);
         
         return taskElement;
-    }
-    
-    function handleAddTask(event) {
-        event.preventDefault();
-        
-        const text = taskInput.value.trim();
-        const cycle = taskCycle.value;
-        
-        console.log('Adding task:', text, cycle);
-        
-        if (text) {
-            addTask(text, cycle);
-            taskInput.value = '';
-        }
-    }
-    
-    function addTask(text, cycle) {
-        const data = JSON.stringify({ text, cycle });
-        console.log('Sending task data:', data);
-        
-        fetch('/api/tasks', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: data
-        })
-        .then(response => {
-            if (!response.ok) {
-                console.error('Server response not OK:', response.status, response.statusText);
-                throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
-            }
-            return response.json();
-        })
-        .then(task => {
-            console.log('Task added successfully:', task);
-            // Add the new task to the array
-            tasks.push(task);
-            // Re-render all tasks
-            renderTasks();
-        })
-        .catch(error => {
-            console.error('Error adding task:', error);
-            showErrorMessage('Failed to add task. Please try again.');
-        });
     }
     
     function showAddSubtaskForm(parentElement, parentId) {
@@ -223,41 +210,128 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        const subtaskForm = document.importNode(subtaskFormTemplate.content, true);
-        const form = subtaskForm.querySelector('.subtask-form');
-        const cancelBtn = subtaskForm.querySelector('.btn-cancel');
+        // Create form container
+        const formContainer = document.createElement('div');
+        formContainer.className = 'subtask-form-container';
+        
+        // Create form
+        const form = document.createElement('form');
+        form.className = 'subtask-form';
+        
+        // Create input
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'subtask-input';
+        input.placeholder = 'Add a subtask...';
+        input.required = true;
+        
+        // Create cycle select
+        const cycleSelect = document.createElement('select');
+        cycleSelect.className = 'subtask-cycle';
+        
+        const cycleOptions = [
+            { value: '', text: 'No cycle' },
+            { value: '5m', text: '5m' },
+            { value: '1h', text: '1h' },
+            { value: '4h', text: '4h' },
+            { value: '12h', text: '12h' },
+            { value: '1d', text: '1d', selected: true },
+            { value: '3d', text: '3d' },
+            { value: '1w', text: '1w' },
+            { value: '1m', text: '1m' },
+            { value: '3m', text: '3m' }
+        ];
+        
+        cycleOptions.forEach(option => {
+            const optionElement = document.createElement('option');
+            optionElement.value = option.value;
+            optionElement.textContent = option.text;
+            if (option.selected) {
+                optionElement.selected = true;
+            }
+            cycleSelect.appendChild(optionElement);
+        });
+        
+        // Create buttons
+        const submitBtn = document.createElement('button');
+        submitBtn.type = 'submit';
+        submitBtn.className = 'btn-primary';
+        submitBtn.textContent = 'Add';
+        
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'btn-cancel';
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.addEventListener('click', () => formContainer.remove());
+        
+        // Assemble form
+        form.appendChild(input);
+        form.appendChild(cycleSelect);
+        form.appendChild(submitBtn);
+        form.appendChild(cancelBtn);
         
         form.addEventListener('submit', function(event) {
             event.preventDefault();
-            
-            const input = this.querySelector('.subtask-input');
-            const cycle = this.querySelector('.subtask-cycle');
             const text = input.value.trim();
-            
             if (text) {
-                addSubtask(parentId, text, cycle.value);
-                this.closest('.subtask-form-container').remove();
+                addSubtask(parentId, text, cycleSelect.value);
+                formContainer.remove();
             }
         });
         
-        cancelBtn.addEventListener('click', function() {
-            this.closest('.subtask-form-container').remove();
-        });
+        // Assemble container and add to parent
+        formContainer.appendChild(form);
+        parentElement.appendChild(formContainer);
+        input.focus();
+    }
+    
+    function handleAddTask(event) {
+        event.preventDefault();
         
-        parentElement.appendChild(subtaskForm);
-        parentElement.querySelector('.subtask-input').focus();
+        const text = taskInput.value.trim();
+        const cycle = taskCycle.value;
+        
+        if (text) {
+            addTask(text, cycle);
+            taskInput.value = '';
+        }
+    }
+    
+    function addTask(text, cycle) {
+        const data = { text, cycle };
+        
+        fetch('/api/tasks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(task => {
+            tasks.push(task);
+            renderTasks();
+        })
+        .catch(error => {
+            console.error('Error adding task:', error);
+            showErrorMessage('Failed to add task: ' + error.message);
+        });
     }
     
     function addSubtask(parentId, text, cycle) {
-        const data = JSON.stringify({ text, cycle });
-        console.log('Sending subtask data:', data);
+        const data = { text, cycle };
         
         fetch(`/api/tasks/${parentId}/subtask`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: data
+            body: JSON.stringify(data)
         })
         .then(response => {
             if (!response.ok) {
@@ -266,7 +340,6 @@ document.addEventListener('DOMContentLoaded', function() {
             return response.json();
         })
         .then(subtask => {
-            console.log('Subtask added successfully:', subtask);
             // Find parent task and add subtask
             const parentTask = tasks.find(task => task.id === parentId);
             if (parentTask) {
@@ -279,13 +352,11 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             console.error('Error adding subtask:', error);
-            showErrorMessage('Failed to add subtask. Please try again.');
+            showErrorMessage('Failed to add subtask: ' + error.message);
         });
     }
     
     function toggleTaskCompletion(id, completed) {
-        console.log('Toggling task completion:', id, completed);
-        
         fetch(`/api/tasks/${id}/status`, {
             method: 'PATCH',
             headers: {
@@ -297,43 +368,16 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) {
                 throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
             }
-            // Update task in local data
-            updateTaskCompletionStatus(id, completed);
-            renderTasks();
+            // Reload tasks to get updated state
+            loadTasks();
         })
         .catch(error => {
             console.error('Error updating task status:', error);
-            showErrorMessage('Failed to update task status. Please try again.');
+            showErrorMessage('Failed to update task status: ' + error.message);
         });
     }
     
-    function updateTaskCompletionStatus(id, completed) {
-        // Check main tasks
-        for (const task of tasks) {
-            if (task.id === id) {
-                task.completedAt = completed ? new Date().toISOString() : null;
-                return;
-            }
-            
-            // Check subtasks
-            if (task.subtasks) {
-                for (const subtask of task.subtasks) {
-                    if (subtask.id === id) {
-                        subtask.completedAt = completed ? new Date().toISOString() : null;
-                        
-                        // Check if all subtasks are complete to auto-complete parent
-                        const allComplete = task.subtasks.every(st => st.completedAt !== null);
-                        task.completedAt = allComplete ? new Date().toISOString() : null;
-                        return;
-                    }
-                }
-            }
-        }
-    }
-    
     function deleteTask(id) {
-        console.log('Deleting task:', id);
-        
         fetch(`/api/tasks/${id}`, {
             method: 'DELETE'
         })
@@ -341,34 +385,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) {
                 throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
             }
-            // Remove task from local data
-            removeTaskFromLocalData(id);
-            renderTasks();
+            // Reload tasks to get updated state
+            loadTasks();
         })
         .catch(error => {
             console.error('Error deleting task:', error);
-            showErrorMessage('Failed to delete task. Please try again.');
+            showErrorMessage('Failed to delete task: ' + error.message);
         });
-    }
-    
-    function removeTaskFromLocalData(id) {
-        // Check for main tasks
-        const taskIndex = tasks.findIndex(task => task.id === id);
-        if (taskIndex !== -1) {
-            tasks.splice(taskIndex, 1);
-            return;
-        }
-        
-        // Check for subtasks
-        for (const task of tasks) {
-            if (task.subtasks) {
-                const subtaskIndex = task.subtasks.findIndex(subtask => subtask.id === id);
-                if (subtaskIndex !== -1) {
-                    task.subtasks.splice(subtaskIndex, 1);
-                    return;
-                }
-            }
-        }
     }
     
     function toggleCompletedTasks() {
@@ -416,7 +439,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function showErrorMessage(message) {
-        // You can implement a more sophisticated error notification here
+        console.error(message);
         alert(message);
     }
 });
