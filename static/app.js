@@ -29,6 +29,14 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(setupSSE, 1000);
     };
   }
+
+  function updateThemeIcon() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const icon = document.querySelector('#theme-toggle i');
+    if (icon) {
+        icon.className = currentTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+    }
+  }
   
   // Initialize the app
   init();
@@ -42,6 +50,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
     // Setup SSE
     setupSSE();
+    updateThemeIcon()
   }
   
   function loadTheme() {
@@ -89,7 +98,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.documentElement.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
-    updateThemeIcon(newTheme);
+    updateThemeIcon();
+    
+    // Also update the icon in the sidebar if it exists
+    const sidebarIcon = document.querySelector('.sidebar #theme-toggle i');
+    if (sidebarIcon) {
+        sidebarIcon.className = newTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
+    }
   }
   
   function loadTasks() {
@@ -433,40 +448,3 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 });
-
-// Placeholder views for Kanban, Gantt, and Calendar
-function setupPlaceholderViews() {
-  const path = window.location.pathname;
-  
-  if (path === '/kanban') {
-    document.querySelector('.content-body').innerHTML = `
-      <div class="placeholder-view">
-        <i class="fas fa-columns"></i>
-        <h3>Kanban View</h3>
-        <p>This view will display your tasks in a kanban board with columns for different statuses.</p>
-        <p>Coming soon!</p>
-      </div>
-    `;
-  } else if (path === '/gantt') {
-    document.querySelector('.content-body').innerHTML = `
-      <div class="placeholder-view">
-        <i class="fas fa-chart-gantt"></i>
-        <h3>Gantt Chart</h3>
-        <p>This view will display your tasks in a timeline with dependencies and durations.</p>
-        <p>Coming soon!</p>
-      </div>
-    `;
-  } else if (path === '/calendar') {
-    document.querySelector('.content-body').innerHTML = `
-      <div class="placeholder-view">
-        <i class="fas fa-calendar"></i>
-        <h3>Calendar View</h3>
-        <p>This view will display your tasks on a calendar based on their due dates.</p>
-        <p>Coming soon!</p>
-      </div>
-    `;
-  }
-}
-
-// Call this function when the page loads
-setupPlaceholderViews();

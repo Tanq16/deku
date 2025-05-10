@@ -394,6 +394,239 @@ body {
   color: var(--border-color);
 }
 
+/* Calendar View Styles */
+.calendar-view-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.calendar-view-controls button {
+    padding: 0.5rem 1rem;
+    background-color: var(--primary-highlighted);
+    color: var(--primary-color);
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+}
+
+.calendar-view-controls button.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.calendar-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.calendar-header h3 {
+    margin: 0;
+    flex: 1;
+    text-align: center;
+}
+
+.calendar-header button {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.5rem;
+}
+
+#today-btn {
+    padding: 0.5rem 1rem;
+    margin-left: auto;
+}
+
+/* Day View */
+.day-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.day-task {
+    background-color: var(--card-bg);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.day-task.completed {
+    opacity: 0.7;
+}
+
+.day-task-time {
+    font-weight: 500;
+    min-width: 60px;
+}
+
+.day-task-text {
+    flex: 1;
+}
+
+/* Week View */
+.week-view {
+    display: flex;
+    gap: 1rem;
+}
+
+.week-day {
+    flex: 1;
+    background-color: var(--card-bg);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+}
+
+.week-day-header {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.week-day-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.week-task {
+    font-size: 0.875rem;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    background-color: var(--primary-highlighted);
+}
+
+.week-task.completed {
+    opacity: 0.7;
+}
+
+.week-task-time {
+    font-size: 0.75rem;
+    color: var(--text-light);
+}
+
+/* Month View */
+.month-view {
+    background-color: var(--card-bg);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+}
+
+.month-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    text-align: center;
+    font-weight: 500;
+}
+
+.month-weekday {
+    padding: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.month-days {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.5rem;
+}
+
+.month-day {
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    background-color: var(--bg-color);
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+}
+
+.month-day.other-month {
+    opacity: 0.4;
+    background-color: transparent;
+}
+
+.month-day.today {
+    background-color: var(--primary-highlighted);
+    border: 1px solid var(--primary-color);
+}
+
+.month-day-number {
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+}
+
+.month-day-tasks {
+    flex: 1;
+    overflow: visible;
+    font-size: 0.75rem;
+}
+
+.month-task {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.25rem;
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.25rem;
+    background-color: var(--primary-highlighted);
+    position: relative;
+}
+
+.month-task.completed {
+    opacity: 0.5;
+}
+
+.month-more-tasks {
+    font-size: 0.7rem;
+    color: var(--text-light);
+    text-align: center;
+}
+
+/* Loading and error states */
+.loading-calendar,
+.error-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: var(--text-light);
+}
+
+.loading-calendar i,
+.error-message i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.no-tasks {
+    color: var(--text-light);
+    font-size: 0.875rem;
+    text-align: center;
+    padding: 0.5rem;
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .week-view {
+        flex-direction: column;
+    }
+    
+    .month-day {
+        aspect-ratio: unset;
+        min-height: 60px;
+    }
+}
+
 /* Kanban, Gantt, Calendar placeholder styles */
 .placeholder-view {
   display: flex;
