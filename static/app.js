@@ -213,13 +213,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </button>
           </div>
         </div>
-        ${subtask.dueAt ? `
-          <div class="task-details">
-            <span class="task-due ${isOverdue ? 'overdue' : ''}" title="Due at">
-              <i class="far fa-clock"></i> ${getDueText(subtask.dueAt)}
-            </span>
-          </div>
-        ` : ''}
       </div>
     `;
   }

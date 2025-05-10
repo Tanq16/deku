@@ -171,7 +171,9 @@ func (ts *TaskStore) UpdateTaskStatus(id string, complete bool) error {
 
 	for _, task := range ts.Tasks {
 		if task.ID == id {
-			if complete {
+			if task.CompletedAt != nil {
+				task.CompletedAt = nil
+			} else if complete {
 				now := time.Now()
 				task.CompletedAt = &now
 			} else {
@@ -197,7 +199,9 @@ func (ts *TaskStore) UpdateSubtaskStatus(parentID, subtaskID string, complete bo
 		if task.ID == parentID {
 			for _, subtask := range task.Subtasks {
 				if subtask.ID == subtaskID {
-					if complete {
+					if subtask.CompletedAt != nil {
+						subtask.CompletedAt = nil
+					} else if complete {
 						now := time.Now()
 						subtask.CompletedAt = &now
 					} else {

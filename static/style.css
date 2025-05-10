@@ -4,7 +4,7 @@
   --primary-light: #8b5cf6;
   --text-color: #1e293b;
   --text-light: #576579;
-  --bg-color: #f8fafc;
+  --bg-color: #f6f8fa;
   --sidebar-bg: #ffffff;
   --card-bg: #ffffff;
   --border-color: #e2e8f0;
@@ -22,8 +22,8 @@
   --primary-light: #a78bfa;
   --text-color: #e2e8f0;
   --text-light: #becde2;
-  --bg-color: #0f172a;
-  --sidebar-bg: #1e293b;
+  --bg-color: #101620;
+  --sidebar-bg: #101620;
   --card-bg: #1e293b;
   --border-color: #334155;
   --success-color: #10b981;
@@ -66,7 +66,8 @@ body {
   align-items: center;
   margin-bottom: 2rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border-color);
+  padding-top: 1rem;
+  border-bottom: none;
 }
 
 .logo-container img {
@@ -100,7 +101,6 @@ body {
 
 .nav-links a:hover {
   background-color: rgba(109, 40, 217, 0.1);
-  color: var(--primary-color);
 }
 
 .nav-links a i {
@@ -137,7 +137,7 @@ body {
 
 .content {
   flex: 1;
-  padding: 1.5rem;
+  padding: 1.5rem 4rem 1.5rem 4rem;
   overflow-y: auto;
 }
 
@@ -174,6 +174,7 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  color: var(--text-light);
 }
 
 .task-form-container {
@@ -237,7 +238,7 @@ body {
   background-color: var(--card-bg);
   border: none;
   border-radius: 0.5rem;
-  padding: 0.5rem;
+  padding: 0.75rem;
   margin-bottom: 0.75rem;
   transition: transform 0.2s, box-shadow 0.2s;
 }
