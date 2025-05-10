@@ -12,6 +12,23 @@ document.addEventListener('DOMContentLoaded', function() {
   // State
   let tasks = [];
   let showCompleted = false;
+  let eventSource;
+
+  // Server Side Event for updating content
+  function setupSSE() {
+    if (eventSource) eventSource.close();
+    
+    eventSource = new EventSource('/api/updates');
+    eventSource.onmessage = function(e) {
+        if (e.data === 'update') {
+            loadTasks();
+        }
+    };
+    eventSource.onerror = function() {
+        // Try to reconnect after 1 second
+        setTimeout(setupSSE, 1000);
+    };
+  }
   
   // Initialize the app
   init();
@@ -19,12 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
   function init() {
     // Load theme preference
     loadTheme();
-    
     // Load tasks
     loadTasks();
-    
     // Set up event listeners
     setupEventListeners();
+    // Setup SSE
+    setupSSE();
   }
   
   function loadTheme() {
@@ -77,15 +94,20 @@ document.addEventListener('DOMContentLoaded', function() {
   
   function loadTasks() {
     fetch('/api/tasks')
-      .then(response => response.json())
-      .then(data => {
-        tasks = data;
-        renderTasks();
-      })
-      .catch(error => {
-        console.error('Error loading tasks:', error);
-        showError('Failed to load tasks');
-      });
+        .then(response => response.json())
+        .then(data => {
+            // Sort tasks by due date (closest first)
+            tasks = data.sort((a, b) => {
+                const aDue = a.dueAt ? new Date(a.dueAt).getTime() : Infinity;
+                const bDue = b.dueAt ? new Date(b.dueAt).getTime() : Infinity;
+                return aDue - bDue;
+            });
+            renderTasks();
+        })
+        .catch(error => {
+            console.error('Error loading tasks:', error);
+            showError('Failed to load tasks');
+        });
   }
   
   function renderTasks() {
@@ -362,18 +384,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const now = new Date();
     const dueDate = new Date(dueAt);
     const diffMs = dueDate - now;
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const diffDays = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((Math.abs(diffMs) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((Math.abs(diffMs) % (1000 * 60 * 60)) / (1000 * 60));
     
     if (diffMs < 0) {
-      return 'Overdue';
+        if (diffDays > 0) {
+            return `Overdue by ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+        } else if (diffHours > 0) {
+            return `Overdue by ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+        } else {
+            return `Overdue by ${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
+        }
     } else if (diffDays > 0) {
-      return `Due in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
+        return `Due in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
     } else if (diffHours > 0) {
-      return `Due in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
+        return `Due in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
     } else {
-      return `Due in ${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
+        return `Due in ${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
     }
   }
   

@@ -32,6 +32,12 @@ var CycleDurations = map[string]time.Duration{
 	"":    0,
 }
 
+// For SSE
+var (
+	clients   = make(map[chan string]bool)
+	clientMux = sync.Mutex{}
+)
+
 type Task struct {
 	ID          string     `json:"id"`
 	Text        string     `json:"text"`
@@ -85,7 +91,7 @@ func NewTaskStore(dbPath string) (*TaskStore, error) {
 	if err := store.Save(); err != nil {
 		return nil, err
 	}
-
+	notifyClients()
 	return store, nil
 }
 
@@ -142,7 +148,7 @@ func (ts *TaskStore) AddTask(text string, cycle string) (*Task, error) {
 	if err := ts.Save(); err != nil {
 		return nil, err
 	}
-
+	notifyClients()
 	return task, nil
 }
 
@@ -171,7 +177,11 @@ func (ts *TaskStore) UpdateTaskStatus(id string, complete bool) error {
 			} else {
 				task.CompletedAt = nil
 			}
-			return ts.Save()
+			err := ts.Save()
+			if err == nil {
+				notifyClients()
+			}
+			return err
 		}
 	}
 
@@ -193,7 +203,11 @@ func (ts *TaskStore) UpdateSubtaskStatus(parentID, subtaskID string, complete bo
 					} else {
 						subtask.CompletedAt = nil
 					}
-					return ts.Save()
+					err := ts.Save()
+					if err == nil {
+						notifyClients()
+					}
+					return err
 				}
 			}
 			return fmt.Errorf("subtask not found")
@@ -211,7 +225,11 @@ func (ts *TaskStore) DeleteTask(id string) error {
 	for i, task := range ts.Tasks {
 		if task.ID == id {
 			ts.Tasks = append(ts.Tasks[:i], ts.Tasks[i+1:]...)
-			return ts.Save()
+			err := ts.Save()
+			if err == nil {
+				notifyClients()
+			}
+			return err
 		}
 	}
 
@@ -228,7 +246,11 @@ func (ts *TaskStore) DeleteSubtask(parentID, subtaskID string) error {
 			for i, subtask := range task.Subtasks {
 				if subtask.ID == subtaskID {
 					task.Subtasks = append(task.Subtasks[:i], task.Subtasks[i+1:]...)
-					return ts.Save()
+					err := ts.Save()
+					if err == nil {
+						notifyClients()
+					}
+					return err
 				}
 			}
 			return fmt.Errorf("subtask not found")
@@ -274,7 +296,7 @@ func (ts *TaskStore) AddSubtask(parentID, text string, cycle string) (*Task, err
 	if err := ts.Save(); err != nil {
 		return nil, err
 	}
-
+	notifyClients()
 	return subtask, nil
 }
 
@@ -508,6 +530,47 @@ func handleCompleteSubtask(store *TaskStore) http.HandlerFunc {
 	}
 }
 
+func handleTaskUpdates(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	messageChan := make(chan string)
+
+	clientMux.Lock()
+	clients[messageChan] = true
+	clientMux.Unlock()
+
+	defer func() {
+		clientMux.Lock()
+		delete(clients, messageChan)
+		clientMux.Unlock()
+		close(messageChan)
+	}()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case msg := <-messageChan:
+			fmt.Fprintf(w, "data: %s\n\n", msg)
+			w.(http.Flusher).Flush()
+		}
+	}
+}
+
+func notifyClients() {
+	clientMux.Lock()
+	defer clientMux.Unlock()
+
+	for client := range clients {
+		select {
+		case client <- "update":
+		default:
+		}
+	}
+}
+
 func main() {
 	log.Println("Starting deku task tracker...")
 
@@ -517,7 +580,7 @@ func main() {
 		log.Fatalf("Failed to create task store: %v", err)
 	}
 
-	// Set up API routes with simplified structure
+	// Set up API routes
 	http.HandleFunc("/api/tasks", handleListTasks(store))
 	http.HandleFunc("/api/task/add", handleAddTask(store))
 	http.HandleFunc("/api/task/delete", handleDeleteTask(store))
@@ -532,6 +595,9 @@ func main() {
 		log.Fatalf("Failed to create static sub-filesystem: %v", err)
 	}
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+
+	// API for SSE updates
+	http.HandleFunc("/api/updates", handleTaskUpdates)
 
 	// Serve HTML templates
 	http.HandleFunc("/", serveEmbeddedTemplate("templates/home.html"))

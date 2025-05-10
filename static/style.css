@@ -11,7 +11,7 @@
   --success-color: #10b981;
   --warning-color: #f59e0b;
   --danger-color: #cf5454;
-  --overdue-color: #ffafaf;
+  --overdue-color: #ffdada;
   --subtask-color: #ebebebcc;
   --overdue-text: #a61f1f;
 }
@@ -29,7 +29,7 @@
   --success-color: #10b981;
   --warning-color: #f59e0b;
   --danger-color: #fecaca;
-  --overdue-color: #59333b;
+  --overdue-color: #45282e;
   --subtask-color: #293850cc;
   --overdue-text: #fecaca;
 }
@@ -214,8 +214,8 @@ body {
 
 .task-form button {
   padding: 0.75rem 1.5rem;
-  background-color: var(--primary-color);
-  color: white;
+  background-color: var(--primary-highlighted);
+  color: var(--primary-color);
   border: none;
   border-radius: 0.5rem;
   font-size: 1rem;
@@ -226,6 +226,7 @@ body {
 
 .task-form button:hover {
   background-color: var(--primary-light);
+  color: white;
 }
 
 .tasks-list {
@@ -236,7 +237,7 @@ body {
   background-color: var(--card-bg);
   border: none;
   border-radius: 0.5rem;
-  padding: 1rem;
+  padding: 0.5rem;
   margin-bottom: 0.75rem;
   transition: transform 0.2s, box-shadow 0.2s;
 }
@@ -252,7 +253,6 @@ body {
 
 .task-item.overdue {
   background-color: var(--overdue-color);
-  border-left: 4px solid var(--danger-color);
 }
 
 .task-header {
@@ -262,8 +262,8 @@ body {
 
 .task-checkbox {
   appearance: none;
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1rem;
+  height: 1rem;
   border: 1.5px solid var(--text-light);
   border-radius: 0.25rem;
   margin-right: 0.75rem;
@@ -287,7 +287,7 @@ body {
 
 .task-text {
   flex: 1;
-  font-size: 1.1rem;
+  font-size: 1rem;
 }
 
 .task-text.completed {
@@ -344,7 +344,7 @@ body {
   background-color: var(--subtask-color);
   border-radius: 0.25rem;
   padding: 0.5rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.15rem;
 }
 
 .subtask-item .task-text {
