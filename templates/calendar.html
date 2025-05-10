@@ -9,8 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script>
         // Apply theme immediately to prevent flash of wrong theme
-        document.documentElement.setAttribute('data-theme', 
-            localStorage.getItem('theme') || 'light');
+        document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
     </script>
 </head>
 <body>
@@ -37,9 +36,9 @@
                 </button>
                 <h2>Calendar</h2>
                 <div class="calendar-view-controls">
-                    <button id="day-view" class="btn-primary active">Day</button>
-                    <button id="week-view" class="btn-primary">Week</button>
                     <button id="month-view" class="btn-primary">Month</button>
+                    <button id="week-view" class="btn-primary">Week</button>
+                    <button id="day-view" class="btn-primary">Day</button>
                 </div>
             </header>
             

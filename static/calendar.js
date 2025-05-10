@@ -11,8 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // State
     let currentDate = new Date();
-    let currentView = 'month'; // default view
-
+    let currentView = 'month'; // Default view is month
+    
     function updateThemeIcon() {
         const currentTheme = document.documentElement.getAttribute('data-theme');
         const icon = document.querySelector('#theme-toggle i');
@@ -26,8 +26,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function init() {
         setupEventListeners();
-        renderCalendar();
-        updateThemeIcon()
+        switchView('month'); // Explicitly set month view on load
+        updateThemeIcon();
     }
     
     function setupEventListeners() {
@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const timeStr = formatTime(dueDate);
                 
                 html += `
-                    <div class="day-task ${task.completedAt ? 'completed' : ''}">
+                    <div class="day-task ${task.completedAt ? 'completed' : ''}" title="${task.text}">
                         <div class="day-task-time">${timeStr}</div>
                         <div class="day-task-text">${task.text}</div>
                     </div>
@@ -208,7 +208,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         ${dayTasks.length === 0 ? 
                             '<div class="no-tasks">No tasks</div>' : 
                             dayTasks.map(task => `
-                                <div class="week-task ${task.completedAt ? 'completed' : ''}">
+                                <div class="week-task ${task.completedAt ? 'completed' : ''}" title="${task.text}">
                                     <div class="week-task-time">${formatTime(new Date(task.dueAt))}</div>
                                     <div class="week-task-text">${task.text}</div>
                                 </div>
@@ -299,8 +299,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         `<div class="month-day-tasks">
                             ${tasksByDay[day].map(task => `
                                 <div class="month-task ${task.completedAt ? 'completed' : ''}" 
-                                    title="${formatTime(new Date(task.dueAt))} ${task.text}">
-                                    ${formatTime(new Date(task.dueAt))} ${task.text}
+                                    title="${formatTime(new Date(task.dueAt))} - ${task.text}">
+                                    ${formatTime(new Date(task.dueAt))} ${task.text.length > 15 ? task.text.substring(0, 15) + '...' : task.text}
                                 </div>
                             `).join('')}
                         </div>` : ''}
@@ -337,12 +337,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     function formatTime(date) {
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    
-    function isSameDay(date1, date2) {
-        return date1.getFullYear() === date2.getFullYear() &&
-               date1.getMonth() === date2.getMonth() &&
-               date1.getDate() === date2.getDate();
     }
     
     // Reused from app.js
