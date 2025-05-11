@@ -53,9 +53,9 @@ body {
 }
 
 .sidebar {
-  width: 250px;
+  width: 220px;
   background-color: var(--sidebar-bg);
-  padding: 1.5rem;
+  padding: 1rem;
   border-right: 1px solid var(--border-color);
   transition: transform 0.3s;
   z-index: 10;
@@ -137,7 +137,7 @@ body {
 
 .content {
   flex: 1;
-  padding: 1.5rem 4rem 1.5rem 4rem;
+  padding: 1.5rem 3rem 1.5rem 3rem;
   overflow-y: auto;
 }
 

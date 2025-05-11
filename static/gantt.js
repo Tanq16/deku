@@ -146,15 +146,10 @@ document.addEventListener('DOMContentLoaded', function() {
         monthEnd.setHours(23, 59, 59, 999);
         
         const relevantTasks = tasks.filter(task => {
-            if (!task.dueAt) return false; // Skip tasks without due dates
+            if (!task.dueAt) return false;
             const dueDate = new Date(task.dueAt);
-            
-            // Check if task is due this month or spans this month
             const createdDate = new Date(task.createdAt);
-            
-            // Task is due this month or was created this month
-            return (dueDate >= monthStart && dueDate <= monthEnd) || 
-                   (createdDate <= monthEnd && dueDate >= monthStart);
+            return (dueDate >= monthStart || createdDate <= monthEnd);
         });
         
         // Sort tasks by due date
@@ -221,16 +216,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Check if task bar should appear in this cell
                 if (shouldShowTaskBar(task, date)) {
-                    const barWidth = calculateBarWidth(task, date, daysInMonth, month, year);
-                    const barPosition = calculateBarPosition(task, date);
+                    const barWidth = 100;
                     
-                    if (barPosition === 0) {
-                        html += `
-                            <div class="gantt-task-bar ${isOverdue ? 'overdue' : ''}" 
-                                style="width: ${barWidth}%; left: 0;">
-                            </div>
-                        `;
-                    }
+                    html += `
+                        <div class="gantt-task-bar ${isOverdue ? 'overdue' : ''}" 
+                            style="width: ${barWidth}%; left: 0;">
+                        </div>
+                    `;
                 }
                 
                 html += `</div>`;
@@ -262,35 +254,5 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Check if the current day is between creation and due date
         return dateOnly >= createdOnly && dateOnly <= dueOnly;
-    }
-    
-    function calculateBarWidth(task, cellDate, daysInMonth, month, year) {
-        const taskDueDate = new Date(task.dueAt);
-        const taskCreatedDate = new Date(task.createdAt);
-        
-        // If created before this month, use 1st day of month as start
-        const startDate = taskCreatedDate.getMonth() === month && taskCreatedDate.getFullYear() === year
-            ? taskCreatedDate.getDate()
-            : 1;
-        
-        // If due after this month, use last day of month as end
-        const endDate = taskDueDate.getMonth() === month && taskDueDate.getFullYear() === year
-            ? taskDueDate.getDate()
-            : daysInMonth;
-        
-        // Duration is at least 1 day
-        const duration = Math.max(1, endDate - startDate + 1);
-        
-        // Cell width is relative to days in month
-        return Math.min(100, (duration / 1) * 100);
-    }
-    
-    function calculateBarPosition(task, cellDate) {
-        const taskCreatedDate = new Date(task.createdAt);
-        
-        // Return 0 if this is the first day of the task
-        return taskCreatedDate.getDate() === cellDate.getDate() && 
-              taskCreatedDate.getMonth() === cellDate.getMonth() && 
-              taskCreatedDate.getFullYear() === cellDate.getFullYear() ? 0 : -1;
     }
 });
