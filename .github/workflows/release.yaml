@@ -67,7 +67,7 @@ jobs:
           go-version: '1.23'
       - name: Build Binary
         run: |
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-w -s" -o deku-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }} ./cmd
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -ldflags="-w -s" -o deku-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows' && '.exe' || '' }} .
       - name: Upload Release Asset
         run: |
           gh release upload "${{ needs.create-release.outputs.version }}" \
