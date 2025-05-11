@@ -1,7 +1,5 @@
-# Deku
-
 <div align="center">
-<img src=".github/assets/logo.png" width="250" />
+<img src=".github/assets/logo.png" width="250" /><br><h1>Deku</h1>
 
 <a href="https://github.com/tanq16/deku/actions/workflows/release.yaml"><img src="https://github.com/tanq16/deku/actions/workflows/release.yaml/badge.svg" alt="Release Build"></a>&nbsp;<a href="https://github.com/Tanq16/deku/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/tanq16/deku"></a>&nbsp;<a href="https://hub.docker.com/r/tanq16/deku"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/tanq16/deku"></a>
 </div>
