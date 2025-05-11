@@ -202,7 +202,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Task label
             html += `
                 <div class="gantt-task-label" title="${task.text}">
-                    ${task.text.length > 25 ? task.text.substring(0, 25) + '...' : task.text}
+                    ${task.text.length > 50 ? task.text.substring(0, 50) + '...' : task.text}
                 </div>
             `;
             

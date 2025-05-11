@@ -844,7 +844,7 @@ body {
   border-radius: 0.5rem;
   overflow: auto;
   padding: 1rem;
-  min-height: calc(100vh - 160px);
+  /* min-height: calc(100vh - 160px); */
 }
 
 .gantt-header {
@@ -878,14 +878,14 @@ body {
   position: sticky;
   left: 0;
   background-color: var(--card-bg);
-  z-index: 1;
-  padding: 0.5rem;
+  z-index: 2;
+  /* padding: 0.15rem; */
   border-right: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  /* white-space: nowrap; */
 }
 
 .gantt-row {
