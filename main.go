@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -63,14 +64,12 @@ func NewTaskStore(dbPath string) (*TaskStore, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
 	}
-
 	// Try to load existing tasks
 	if _, err := os.Stat(dbPath); err == nil {
 		data, err := os.ReadFile(dbPath)
 		if err != nil {
 			return nil, err
 		}
-
 		if len(data) > 0 {
 			var storedData struct {
 				Tasks []*Task `json:"tasks"`
@@ -91,46 +90,37 @@ func NewTaskStore(dbPath string) (*TaskStore, error) {
 	return store, nil
 }
 
-// Save saves the tasks to the JSON file
 func (ts *TaskStore) Save() error {
-	data, err := json.MarshalIndent(map[string]interface{}{
+	data, err := json.MarshalIndent(map[string]any{
 		"tasks": ts.Tasks,
 	}, "", "  ")
 	if err != nil {
 		return err
 	}
-
 	return os.WriteFile(ts.dbPath, data, 0644)
 }
 
-// calculateDueAt calculates the due time based on the cycle string
 func calculateDueAt(createdAt time.Time, cycle string) *time.Time {
 	if cycle == "" {
 		return nil // No due date for tasks without cycles
 	}
-
 	duration, exists := CycleDurations[cycle]
 	if !exists {
 		// Default to 1 day if cycle is not recognized
 		duration = 24 * time.Hour
 	}
-
 	if duration == 0 {
 		return nil
 	}
-
 	dueTime := createdAt.Add(duration)
 	return &dueTime
 }
 
-// AddTask adds a new task
 func (ts *TaskStore) AddTask(text string, cycle string) (*Task, error) {
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
-
 	createdAt := time.Now()
 	dueAt := calculateDueAt(createdAt, cycle)
-
 	task := &Task{
 		ID:        uuid.New().String(),
 		Text:      text,
@@ -138,9 +128,7 @@ func (ts *TaskStore) AddTask(text string, cycle string) (*Task, error) {
 		Cycle:     cycle,
 		DueAt:     dueAt,
 	}
-
 	ts.Tasks = append(ts.Tasks, task)
-
 	if err := ts.Save(); err != nil {
 		return nil, err
 	}
@@ -148,22 +136,17 @@ func (ts *TaskStore) AddTask(text string, cycle string) (*Task, error) {
 	return task, nil
 }
 
-// GetAllTasks returns all tasks
 func (ts *TaskStore) GetAllTasks() []*Task {
 	ts.mutex.RLock()
 	defer ts.mutex.RUnlock()
-
 	tasksCopy := make([]*Task, len(ts.Tasks))
 	copy(tasksCopy, ts.Tasks)
-
 	return tasksCopy
 }
 
-// UpdateTaskStatus toggles task completion status
 func (ts *TaskStore) UpdateTaskStatus(id string, complete bool) error {
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
-
 	for _, task := range ts.Tasks {
 		if task.ID == id {
 			if task.CompletedAt != nil {
@@ -181,15 +164,12 @@ func (ts *TaskStore) UpdateTaskStatus(id string, complete bool) error {
 			return err
 		}
 	}
-
 	return fmt.Errorf("task not found")
 }
 
-// DeleteTask removes a task
 func (ts *TaskStore) DeleteTask(id string) error {
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
-
 	for i, task := range ts.Tasks {
 		if task.ID == id {
 			ts.Tasks = append(ts.Tasks[:i], ts.Tasks[i+1:]...)
@@ -200,118 +180,97 @@ func (ts *TaskStore) DeleteTask(id string) error {
 			return err
 		}
 	}
-
 	return fmt.Errorf("task not found")
 }
 
-// Handle list all tasks
 func handleListTasks(store *TaskStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		tasks := store.GetAllTasks()
 		json.NewEncoder(w).Encode(tasks)
 	}
 }
 
-// Handle add task
 func handleAddTask(store *TaskStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
 		var data struct {
 			Text  string `json:"text"`
 			Cycle string `json:"cycle"`
 		}
-
 		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 			http.Error(w, "Invalid request format", http.StatusBadRequest)
 			return
 		}
-
 		if data.Text == "" {
 			http.Error(w, "Task text cannot be empty", http.StatusBadRequest)
 			return
 		}
-
 		task, err := store.AddTask(data.Text, data.Cycle)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(task)
 	}
 }
 
-// Handle delete task
 func handleDeleteTask(store *TaskStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
 		var data struct {
 			ID string `json:"id"`
 		}
-
 		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 			http.Error(w, "Invalid request format", http.StatusBadRequest)
 			return
 		}
-
 		if data.ID == "" {
 			http.Error(w, "Task ID cannot be empty", http.StatusBadRequest)
 			return
 		}
-
 		if err := store.DeleteTask(data.ID); err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 	}
 }
 
-// Handle complete task
 func handleCompleteTask(store *TaskStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
 		var data struct {
 			ID string `json:"id"`
 		}
-
 		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
 			http.Error(w, "Invalid request format", http.StatusBadRequest)
 			return
 		}
-
 		if data.ID == "" {
 			http.Error(w, "Task ID cannot be empty", http.StatusBadRequest)
 			return
 		}
-
 		if err := store.UpdateTaskStatus(data.ID, true); err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 	}
@@ -321,20 +280,16 @@ func handleTaskUpdates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-
 	messageChan := make(chan string)
-
 	clientMux.Lock()
 	clients[messageChan] = true
 	clientMux.Unlock()
-
 	defer func() {
 		clientMux.Lock()
 		delete(clients, messageChan)
 		clientMux.Unlock()
 		close(messageChan)
 	}()
-
 	for {
 		select {
 		case <-r.Context().Done():
@@ -349,7 +304,6 @@ func handleTaskUpdates(w http.ResponseWriter, r *http.Request) {
 func notifyClients() {
 	clientMux.Lock()
 	defer clientMux.Unlock()
-
 	for client := range clients {
 		select {
 		case client <- "update":
@@ -358,11 +312,69 @@ func notifyClients() {
 	}
 }
 
+func sendNotification(task *Task, notificationURL string) {
+	message := fmt.Sprintf("Task Due: %s", task.Text)
+	payload := map[string]string{"content": message}
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Error marshalling notification payload: %v", err)
+		return
+	}
+	resp, err := http.Post(notificationURL, "application/json", bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		log.Printf("Error sending notification for task %s: %v", task.ID, err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		log.Printf("Notification service returned non-success status code: %d for task %s", resp.StatusCode, task.ID)
+	} else {
+		log.Printf("Sent 'due' notification for task: %s", task.Text)
+	}
+}
+
+func checkAndSendNotifications(store *TaskStore, notificationURL string) {
+	tasks := store.GetAllTasks()
+	now := time.Now()
+	fiveMinutesAgo := now.Add(-5 * time.Minute)
+	for _, task := range tasks {
+		if task.CompletedAt != nil || task.DueAt == nil {
+			continue
+		}
+		if task.DueAt.After(fiveMinutesAgo) && !task.DueAt.After(now) {
+			sendNotification(task, notificationURL)
+		}
+	}
+}
+
+func startNotificationScheduler(store *TaskStore, notificationURL string) {
+	log.Printf("Notification scheduler URL: %s", notificationURL)
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	// run once
+	checkAndSendNotifications(store, notificationURL)
+	for range ticker.C {
+		checkAndSendNotifications(store, notificationURL)
+	}
+}
+
 func main() {
 	log.Println("Starting deku task tracker...")
 	store, err := NewTaskStore("data/tasks.json")
 	if err != nil {
 		log.Fatalf("Failed to create task store: %v", err)
+	}
+
+	// Notifications
+	notificationSetting := os.Getenv("NOTIFICATION")
+	if notificationSetting == "disable" {
+		log.Println("Notifications are disabled via env var")
+	} else {
+		notificationURL := "http://nottif:8080/api/notify" // Default for Nottif in network
+		if notificationSetting != "" {
+			notificationURL = notificationSetting
+		}
+		go startNotificationScheduler(store, notificationURL)
 	}
 
 	http.HandleFunc("/api/tasks", handleListTasks(store))
