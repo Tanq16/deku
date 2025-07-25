@@ -20,7 +20,6 @@ var content embed.FS
 
 // CycleDurations maps cycle string values to time.Duration values
 var CycleDurations = map[string]time.Duration{
-	"5m":  5 * time.Minute,
 	"1h":  1 * time.Hour,
 	"4h":  4 * time.Hour,
 	"12h": 12 * time.Hour,
@@ -45,7 +44,6 @@ type Task struct {
 	CompletedAt *time.Time `json:"completedAt,omitempty"`
 	Cycle       string     `json:"cycle"` // Keep the cycle value for frontend display
 	DueAt       *time.Time `json:"dueAt,omitempty"`
-	Subtasks    []*Task    `json:"subtasks,omitempty"`
 }
 
 type TaskStore struct {
@@ -78,8 +76,6 @@ func NewTaskStore(dbPath string) (*TaskStore, error) {
 				Tasks []*Task `json:"tasks"`
 			}
 			if err := json.Unmarshal(data, &storedData); err != nil {
-				// If the file exists but is not valid JSON or doesn't have the expected structure,
-				// start with an empty task list
 				log.Printf("Error parsing existing tasks file: %v. Starting with empty task list.", err)
 			} else {
 				store.Tasks = storedData.Tasks
@@ -157,7 +153,6 @@ func (ts *TaskStore) GetAllTasks() []*Task {
 	ts.mutex.RLock()
 	defer ts.mutex.RUnlock()
 
-	// Return a copy to prevent concurrent modification
 	tasksCopy := make([]*Task, len(ts.Tasks))
 	copy(tasksCopy, ts.Tasks)
 
@@ -190,37 +185,6 @@ func (ts *TaskStore) UpdateTaskStatus(id string, complete bool) error {
 	return fmt.Errorf("task not found")
 }
 
-// UpdateSubtaskStatus toggles subtask completion status
-func (ts *TaskStore) UpdateSubtaskStatus(parentID, subtaskID string, complete bool) error {
-	ts.mutex.Lock()
-	defer ts.mutex.Unlock()
-
-	for _, task := range ts.Tasks {
-		if task.ID == parentID {
-			for _, subtask := range task.Subtasks {
-				if subtask.ID == subtaskID {
-					if subtask.CompletedAt != nil {
-						subtask.CompletedAt = nil
-					} else if complete {
-						now := time.Now()
-						subtask.CompletedAt = &now
-					} else {
-						subtask.CompletedAt = nil
-					}
-					err := ts.Save()
-					if err == nil {
-						notifyClients()
-					}
-					return err
-				}
-			}
-			return fmt.Errorf("subtask not found")
-		}
-	}
-
-	return fmt.Errorf("parent task not found")
-}
-
 // DeleteTask removes a task
 func (ts *TaskStore) DeleteTask(id string) error {
 	ts.mutex.Lock()
@@ -238,70 +202,6 @@ func (ts *TaskStore) DeleteTask(id string) error {
 	}
 
 	return fmt.Errorf("task not found")
-}
-
-// DeleteSubtask removes a subtask from a parent task
-func (ts *TaskStore) DeleteSubtask(parentID, subtaskID string) error {
-	ts.mutex.Lock()
-	defer ts.mutex.Unlock()
-
-	for _, task := range ts.Tasks {
-		if task.ID == parentID {
-			for i, subtask := range task.Subtasks {
-				if subtask.ID == subtaskID {
-					task.Subtasks = append(task.Subtasks[:i], task.Subtasks[i+1:]...)
-					err := ts.Save()
-					if err == nil {
-						notifyClients()
-					}
-					return err
-				}
-			}
-			return fmt.Errorf("subtask not found")
-		}
-	}
-
-	return fmt.Errorf("parent task not found")
-}
-
-// AddSubtask adds a subtask to a parent task
-func (ts *TaskStore) AddSubtask(parentID, text string, cycle string) (*Task, error) {
-	ts.mutex.Lock()
-	defer ts.mutex.Unlock()
-
-	createdAt := time.Now()
-	dueAt := calculateDueAt(createdAt, cycle)
-
-	subtask := &Task{
-		ID:        uuid.New().String(),
-		Text:      text,
-		CreatedAt: createdAt,
-		Cycle:     cycle,
-		DueAt:     dueAt,
-	}
-
-	// Find parent task
-	found := false
-	for _, task := range ts.Tasks {
-		if task.ID == parentID {
-			if task.Subtasks == nil {
-				task.Subtasks = []*Task{}
-			}
-			task.Subtasks = append(task.Subtasks, subtask)
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return nil, fmt.Errorf("parent task not found")
-	}
-
-	if err := ts.Save(); err != nil {
-		return nil, err
-	}
-	notifyClients()
-	return subtask, nil
 }
 
 // Handle list all tasks
@@ -417,123 +317,6 @@ func handleCompleteTask(store *TaskStore) http.HandlerFunc {
 	}
 }
 
-// Handle add subtask
-func handleAddSubtask(store *TaskStore) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var data struct {
-			ParentID string `json:"parentId"`
-			Text     string `json:"text"`
-			Cycle    string `json:"cycle"`
-		}
-
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
-			return
-		}
-
-		if data.ParentID == "" {
-			http.Error(w, "Parent task ID cannot be empty", http.StatusBadRequest)
-			return
-		}
-
-		if data.Text == "" {
-			http.Error(w, "Subtask text cannot be empty", http.StatusBadRequest)
-			return
-		}
-
-		subtask, err := store.AddSubtask(data.ParentID, data.Text, data.Cycle)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(subtask)
-	}
-}
-
-// Handle delete subtask
-func handleDeleteSubtask(store *TaskStore) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var data struct {
-			ParentID string `json:"parentId"`
-			ID       string `json:"id"`
-		}
-
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
-			return
-		}
-
-		if data.ParentID == "" {
-			http.Error(w, "Parent task ID cannot be empty", http.StatusBadRequest)
-			return
-		}
-
-		if data.ID == "" {
-			http.Error(w, "Subtask ID cannot be empty", http.StatusBadRequest)
-			return
-		}
-
-		if err := store.DeleteSubtask(data.ParentID, data.ID); err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
-	}
-}
-
-// Handle complete subtask
-func handleCompleteSubtask(store *TaskStore) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var data struct {
-			ParentID string `json:"parentId"`
-			ID       string `json:"id"`
-		}
-
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Invalid request format", http.StatusBadRequest)
-			return
-		}
-
-		if data.ParentID == "" {
-			http.Error(w, "Parent task ID cannot be empty", http.StatusBadRequest)
-			return
-		}
-
-		if data.ID == "" {
-			http.Error(w, "Subtask ID cannot be empty", http.StatusBadRequest)
-			return
-		}
-
-		if err := store.UpdateSubtaskStatus(data.ParentID, data.ID, true); err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
-	}
-}
-
 func handleTaskUpdates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -577,21 +360,15 @@ func notifyClients() {
 
 func main() {
 	log.Println("Starting deku task tracker...")
-
-	// Create a task store
 	store, err := NewTaskStore("data/tasks.json")
 	if err != nil {
 		log.Fatalf("Failed to create task store: %v", err)
 	}
 
-	// Set up API routes
 	http.HandleFunc("/api/tasks", handleListTasks(store))
 	http.HandleFunc("/api/task/add", handleAddTask(store))
 	http.HandleFunc("/api/task/delete", handleDeleteTask(store))
 	http.HandleFunc("/api/task/complete", handleCompleteTask(store))
-	http.HandleFunc("/api/subtask/add", handleAddSubtask(store))
-	http.HandleFunc("/api/subtask/delete", handleDeleteSubtask(store))
-	http.HandleFunc("/api/subtask/complete", handleCompleteSubtask(store))
 
 	// Serve static files from embedded filesystem
 	staticFS, err := fs.Sub(content, "static")
@@ -603,10 +380,8 @@ func main() {
 	// API for SSE updates
 	http.HandleFunc("/api/updates", handleTaskUpdates)
 
-	// Serve HTML templates
 	http.HandleFunc("/", serveEmbeddedTemplate("templates/home.html"))
 	http.HandleFunc("/kanban", serveEmbeddedTemplate("templates/kanban.html"))
-	http.HandleFunc("/gantt", serveEmbeddedTemplate("templates/gantt.html"))
 	http.HandleFunc("/calendar", serveEmbeddedTemplate("templates/calendar.html"))
 
 	// Start the server

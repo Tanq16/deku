@@ -5,16 +5,23 @@ document.addEventListener('DOMContentLoaded', function() {
   const taskInput = document.getElementById('task-input');
   const taskCycle = document.getElementById('task-cycle');
   const showCompletedCheckbox = document.getElementById('show-completed-checkbox');
-  const themeToggle = document.getElementById('theme-toggle');
-  const toggleSidebar = document.getElementById('toggle-sidebar');
-  const sidebar = document.querySelector('.sidebar');
+  const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+  const sidebar = document.getElementById('sidebar');
   
   // State
   let tasks = [];
   let showCompleted = false;
   let eventSource;
 
-  // Server Side Event for updating content
+  // Initialize the app
+  init();
+  
+  function init() {
+    loadTasks();
+    setupEventListeners();
+    setupSSE();
+  }
+  
   function setupSSE() {
     if (eventSource) eventSource.close();
     
@@ -25,94 +32,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
     eventSource.onerror = function() {
-        // Try to reconnect after 1 second
         setTimeout(setupSSE, 1000);
     };
   }
-
-  function updateThemeIcon() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const icon = document.querySelector('#theme-toggle i');
-    if (icon) {
-        icon.className = currentTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-    }
-  }
-  
-  // Initialize the app
-  init();
-  
-  function init() {
-    // Load theme preference
-    loadTheme();
-    // Load tasks
-    loadTasks();
-    // Set up event listeners
-    setupEventListeners();
-    // Setup SSE
-    setupSSE();
-    updateThemeIcon()
-  }
-  
-  function loadTheme() {
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    updateThemeIcon(savedTheme);
-  }
-  
-  function updateThemeIcon(theme) {
-    const icon = themeToggle.querySelector('i');
-    icon.className = theme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-  }
   
   function setupEventListeners() {
-    // Task form submission
     taskForm.addEventListener('submit', handleAddTask);
     
-    // Show completed tasks toggle
     showCompletedCheckbox.addEventListener('change', function() {
       showCompleted = this.checked;
       renderTasks();
     });
     
-    // Theme toggle
-    themeToggle.addEventListener('click', toggleTheme);
-    
-    // Mobile sidebar toggle
-    toggleSidebar.addEventListener('click', function() {
-      sidebar.classList.toggle('visible');
+    toggleSidebarBtn.addEventListener('click', function() {
+      sidebar.classList.toggle('hidden');
     });
     
-    // Close sidebar when clicking outside on mobile
     document.addEventListener('click', function(event) {
-      if (window.innerWidth <= 768 && 
+      if (window.innerWidth < 768 && 
           !sidebar.contains(event.target) && 
-          !toggleSidebar.contains(event.target)) {
-        sidebar.classList.remove('visible');
+          !toggleSidebarBtn.contains(event.target)) {
+        sidebar.classList.add('hidden');
       }
     });
-  }
-  
-  function toggleTheme() {
-    const currentTheme = document.documentElement.getAttribute('data-theme');
-    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-    
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    updateThemeIcon();
-    
-    // Also update the icon in the sidebar if it exists
-    const sidebarIcon = document.querySelector('.sidebar #theme-toggle i');
-    if (sidebarIcon) {
-        sidebarIcon.className = newTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-    }
   }
   
   function loadTasks() {
     fetch('/api/tasks')
         .then(response => response.json())
         .then(data => {
-            // Sort tasks by due date (closest first)
-            tasks = data.sort((a, b) => {
+            tasks = (data || []).sort((a, b) => {
                 const aDue = a.dueAt ? new Date(a.dueAt).getTime() : Infinity;
                 const bDue = b.dueAt ? new Date(b.dueAt).getTime() : Infinity;
                 return aDue - bDue;
@@ -132,9 +81,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     if (filteredTasks.length === 0) {
       tasksList.innerHTML = `
-        <div class="empty-state">
-          <i class="fas fa-tasks"></i>
-          <p>No tasks found. Add a new task to get started!</p>
+        <div class="text-center py-10 text-subtext0">
+          <i class="fas fa-tasks text-4xl"></i>
+          <p class="mt-4">No tasks found. Add one to get started!</p>
         </div>
       `;
       return;
@@ -151,300 +100,109 @@ document.addEventListener('DOMContentLoaded', function() {
     const isOverdue = task.dueAt && !isCompleted && new Date(task.dueAt) < new Date();
     
     const taskElement = document.createElement('li');
-    taskElement.className = `task-item ${isCompleted ? 'completed' : ''} ${isOverdue ? 'overdue' : ''}`;
+    taskElement.className = `bg-base p-2 rounded-lg mb-3 transition-shadow hover:shadow-lg ${isCompleted ? 'opacity-60' : ''} ${isOverdue ? 'border border-red' : 'border border-transparent'}`;
     taskElement.dataset.id = task.id;
     
-    // Format dates
-    const createdAt = formatDate(task.createdAt);
-    const dueDate = task.dueAt ? formatDate(task.dueAt) : null;
     const dueText = getDueText(task.dueAt);
     
     taskElement.innerHTML = `
-      <div class="task-header">
-        <input type="checkbox" class="task-checkbox" ${isCompleted ? 'checked' : ''}>
-        <span class="task-text ${isCompleted ? 'completed' : ''}">${task.text}</span>
-        <div class="task-actions">
-          <button class="task-btn add-subtask-btn" title="Add subtask">
-            <i class="fas fa-plus-circle"></i>
-          </button>
-          <button class="task-btn delete-btn" title="Delete task">
-            <i class="fas fa-trash"></i>
-          </button>
+      <div class="flex items-center gap-3">
+        <input type="checkbox" class="task-checkbox appearance-none w-5 h-5 bg-surface0 rounded-md cursor-pointer checked:bg-mauve flex-shrink-0 flex items-center justify-center" ${isCompleted ? 'checked' : ''}>
+        <span class="flex-grow ${isCompleted ? 'line-through text-subtext0' : ''}">${task.text}</span>
+        <div class="flex items-center gap-2">
+          <button class="delete-btn text-subtext0 hover:text-red" title="Delete task"><i class="fas fa-trash"></i></button>
         </div>
       </div>
-      <div class="task-details">
-        ${dueDate ? `
-          <span class="task-due ${isOverdue ? 'overdue' : ''}" title="Due at">
-            <i class="far fa-clock"></i> ${dueText}
-          </span>
-        ` : ''}
-      </div>
-      ${task.subtasks && task.subtasks.length > 0 ? `
-        <div class="subtasks">
-          ${task.subtasks.map(subtask => createSubtaskElement(subtask)).join('')}
-        </div>
-      ` : ''}
-      <form class="subtask-form" style="display: none;">
-        <input type="text" placeholder="Add a subtask..." required>
-        <button type="submit" class="btn-primary">Add</button>
-      </form>
+      ${task.dueAt ? `<div class="pl-8 mt-1 text-sm ${isOverdue ? 'text-red font-semibold' : 'text-subtext0'}"><i class="far fa-clock mr-1.5"></i>${dueText}</div>` : ''}
     `;
     
-    // Add event listeners to the task
-    const checkbox = taskElement.querySelector('.task-checkbox');
-    const deleteBtn = taskElement.querySelector('.delete-btn');
-    const addSubtaskBtn = taskElement.querySelector('.add-subtask-btn');
-    const subtaskForm = taskElement.querySelector('.subtask-form');
-    
-    checkbox.addEventListener('change', () => toggleTaskCompletion(task.id, checkbox.checked));
-    deleteBtn.addEventListener('click', () => deleteTask(task.id));
-    addSubtaskBtn.addEventListener('click', () => {
-      subtaskForm.style.display = 'flex';
-    });
-    
-    subtaskForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const input = this.querySelector('input');
-      addSubtask(task.id, input.value, '');
-      input.value = '';
-      this.style.display = 'none';
-    });
+    // Event listeners
+    taskElement.querySelector('.task-checkbox').addEventListener('change', (e) => toggleTaskCompletion(task.id, e.target.checked));
+    taskElement.querySelector('.delete-btn').addEventListener('click', () => deleteTask(task.id));
     
     return taskElement;
   }
   
-  function createSubtaskElement(subtask) {
-    const isCompleted = !!subtask.completedAt;
-    const isOverdue = subtask.dueAt && !isCompleted && new Date(subtask.dueAt) < new Date();
-    
-    return `
-      <div class="subtask-item ${isCompleted ? 'completed' : ''} ${isOverdue ? 'overdue' : ''}" data-id="${subtask.id}">
-        <div class="task-header">
-          <input type="checkbox" class="task-checkbox" ${isCompleted ? 'checked' : ''}>
-          <span class="task-text ${isCompleted ? 'completed' : ''}">${subtask.text}</span>
-          <div class="task-actions">
-            <button class="task-btn delete-subtask-btn" title="Delete subtask">
-              <i class="fas fa-trash"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-  
   function handleAddTask(e) {
     e.preventDefault();
-    
     const text = taskInput.value.trim();
     const cycle = taskCycle.value;
-    
     if (!text) return;
     
     fetch('/api/task/add', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, cycle }),
     })
-      .then(response => response.json())
-      .then(newTask => {
-        tasks.push(newTask);
-        renderTasks();
+    .then(res => {
+        if (!res.ok) throw new Error('Server responded with an error');
         taskInput.value = '';
-      })
-      .catch(error => {
-        console.error('Error adding task:', error);
-        showError('Failed to add task');
-      });
+        // SSE will handle the update
+    })
+    .catch(err => showError('Failed to add task'));
   }
   
   function toggleTaskCompletion(taskId, completed) {
     fetch('/api/task/complete', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: taskId }),
-    })
-      .then(() => {
-        const task = tasks.find(t => t.id === taskId);
-        if (task) {
-          if (completed) {
-            task.completedAt = new Date().toISOString();
-          } else {
-            task.completedAt = null;
-          }
-        }
-        renderTasks();
-      })
-      .catch(error => {
-        console.error('Error toggling task completion:', error);
-        showError('Failed to update task');
-      });
+    }).catch(err => showError('Failed to update task'));
   }
   
   function deleteTask(taskId) {
-    if (!confirm('Are you sure you want to delete this task?')) return;
-    
-    fetch('/api/task/delete', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ id: taskId }),
-    })
-      .then(() => {
-        tasks = tasks.filter(task => task.id !== taskId);
-        renderTasks();
-      })
-      .catch(error => {
-        console.error('Error deleting task:', error);
-        showError('Failed to delete task');
-      });
+    showConfirmation('Are you sure you want to delete this task?', () => {
+      fetch('/api/task/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId }),
+      }).catch(err => showError('Failed to delete task'));
+    });
   }
   
-  function addSubtask(parentId, text, cycle) {
-    fetch('/api/subtask/add', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ parentId, text, cycle }),
-    })
-      .then(response => response.json())
-      .then(newSubtask => {
-        const parentTask = tasks.find(task => task.id === parentId);
-        if (parentTask) {
-          if (!parentTask.subtasks) {
-            parentTask.subtasks = [];
-          }
-          parentTask.subtasks.push(newSubtask);
-          renderTasks();
-        }
-      })
-      .catch(error => {
-        console.error('Error adding subtask:', error);
-        showError('Failed to add subtask');
-      });
-  }
-  
-  function toggleSubtaskCompletion(parentId, subtaskId, completed) {
-    fetch('/api/subtask/complete', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ parentId, id: subtaskId }),
-    })
-      .then(() => {
-        const parentTask = tasks.find(task => task.id === parentId);
-        if (parentTask && parentTask.subtasks) {
-          const subtask = parentTask.subtasks.find(st => st.id === subtaskId);
-          if (subtask) {
-            if (completed) {
-              subtask.completedAt = new Date().toISOString();
-            } else {
-              subtask.completedAt = null;
-            }
-          }
-        }
-        renderTasks();
-      })
-      .catch(error => {
-        console.error('Error toggling subtask completion:', error);
-        showError('Failed to update subtask');
-      });
-  }
-  
-  function deleteSubtask(parentId, subtaskId) {
-    if (!confirm('Are you sure you want to delete this subtask?')) return;
-    
-    fetch('/api/subtask/delete', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ parentId, id: subtaskId }),
-    })
-      .then(() => {
-        const parentTask = tasks.find(task => task.id === parentId);
-        if (parentTask && parentTask.subtasks) {
-          parentTask.subtasks = parentTask.subtasks.filter(st => st.id !== subtaskId);
-          renderTasks();
-        }
-      })
-      .catch(error => {
-        console.error('Error deleting subtask:', error);
-        showError('Failed to delete subtask');
-      });
-  }
-  
-  // Helper functions
-  function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  
+  // --- Helpers ---
   function getDueText(dueAt) {
     if (!dueAt) return '';
-    
     const now = new Date();
     const dueDate = new Date(dueAt);
     const diffMs = dueDate - now;
-    const diffDays = Math.floor(Math.abs(diffMs) / (1000 * 60 * 60 * 24));
-    const diffHours = Math.floor((Math.abs(diffMs) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const diffMinutes = Math.floor((Math.abs(diffMs) % (1000 * 60 * 60)) / (1000 * 60));
-    
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+
     if (diffMs < 0) {
-        if (diffDays > 0) {
-            return `Overdue by ${diffDays} day${diffDays > 1 ? 's' : ''}`;
-        } else if (diffHours > 0) {
-            return `Overdue by ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
-        } else {
-            return `Overdue by ${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
-        }
-    } else if (diffDays > 0) {
-        return `Due in ${diffDays} day${diffDays > 1 ? 's' : ''}`;
-    } else if (diffHours > 0) {
-        return `Due in ${diffHours} hour${diffHours > 1 ? 's' : ''}`;
-    } else {
-        return `Due in ${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
+        if (Math.abs(diffDays) > 0) return `Overdue by ${Math.abs(diffDays)} day(s)`;
+        return `Overdue by ${Math.abs(diffHours)} hour(s)`;
     }
+    if (diffDays > 0) return `Due in ${diffDays} day(s)`;
+    return `Due in ${diffHours} hour(s)`;
   }
   
   function showError(message) {
     const alert = document.createElement('div');
-    alert.className = 'alert-error';
+    alert.className = 'fixed top-5 right-5 bg-red text-crust px-4 py-2 rounded-lg shadow-lg animate-pulse';
     alert.textContent = message;
     document.body.appendChild(alert);
-    
-    setTimeout(() => {
-      alert.remove();
-    }, 3000);
+    setTimeout(() => alert.remove(), 3000);
   }
-  
-  // Event delegation for dynamically added elements
-  tasksList.addEventListener('click', function(e) {
-    // Handle subtask checkbox toggle
-    if (e.target.classList.contains('task-checkbox') && e.target.closest('.subtask-item')) {
-      const subtaskItem = e.target.closest('.subtask-item');
-      const parentTask = subtaskItem.closest('.task-item');
-      const parentId = parentTask.dataset.id;
-      const subtaskId = subtaskItem.dataset.id;
-      const isCompleted = e.target.checked;
-      
-      toggleSubtaskCompletion(parentId, subtaskId, isCompleted);
-    }
-    
-    // Handle subtask delete
-    if (e.target.classList.contains('delete-subtask-btn') || e.target.closest('.delete-subtask-btn')) {
-      const subtaskItem = e.target.closest('.subtask-item');
-      const parentTask = subtaskItem.closest('.task-item');
-      const parentId = parentTask.dataset.id;
-      const subtaskId = subtaskItem.dataset.id;
-      
-      deleteSubtask(parentId, subtaskId);
-    }
-  });
+
+  function showConfirmation(message, onConfirm) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-base p-6 rounded-lg shadow-xl max-w-sm w-full">
+            <p class="text-text mb-4">${message}</p>
+            <div class="flex justify-end gap-3">
+                <button id="confirm-cancel" class="bg-surface1 text-text px-4 py-2 rounded-lg hover:bg-surface2">Cancel</button>
+                <button id="confirm-ok" class="bg-red text-crust px-4 py-2 rounded-lg hover:brightness-110">Confirm</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('confirm-ok').onclick = () => {
+        onConfirm();
+        modal.remove();
+    };
+    document.getElementById('confirm-cancel').onclick = () => modal.remove();
+  }
 });

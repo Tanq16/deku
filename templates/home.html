@@ -1,96 +1,134 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Deku - Task Tracker</title>
-    <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/favicon.ico">
     <link rel="apple-touch-icon" href="/static/pwa/icons/icon-192x192.png">
     <link rel="manifest" href="/static/pwa/manifest.json">
-    <meta name="theme-color" content="#6d28d9">
+    <meta name="theme-color" content="#1e1e2e">
     <link rel="stylesheet" href="/static/fontawesome/css/all.min.css">
+    <link href="/css/inter.css" rel="stylesheet">
+    <script src="/static/js/tailwindcss.js"></script>
     <script>
-        // Apply theme immediately to prevent flash of wrong theme
-        document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+        tailwind.config = {
+          darkMode: 'class',
+          theme: {
+            extend: {
+              fontFamily: {
+                sans: ['Inter', 'sans-serif'],
+              },
+              colors: {
+                // Catppuccin Mocha Palette
+                rosewater: '#f5e0dc',
+                flamingo: '#f2cdcd',
+                pink: '#f5c2e7',
+                mauve: '#cba6f7',
+                red: '#f38ba8',
+                maroon: '#eba0ac',
+                peach: '#fab387',
+                yellow: '#f9e2af',
+                green: '#a6e3a1',
+                teal: '#94e2d5',
+                sky: '#89dceb',
+                sapphire: '#74c7ec',
+                blue: '#89b4fa',
+                lavender: '#b4befe',
+                text: '#cdd6f4',
+                subtext1: '#bac2de',
+                subtext0: '#a6adc8',
+                overlay2: '#9399b2',
+                overlay1: '#7f849c',
+                overlay0: '#6c7086',
+                surface2: '#585b70',
+                surface1: '#45475a',
+                surface0: '#313244',
+                base: '#1e1e2e',
+                mantle: '#181825',
+                crust: '#11111b'
+              }
+            }
+          }
+        }
     </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #11111b; } /* crust */
+        ::-webkit-scrollbar-thumb { background: #313244; border-radius: 4px; } /* surface0 */
+        ::-webkit-scrollbar-thumb:hover { background: #45475a; } /* surface1 */
+        .task-checkbox:checked::after {
+            content: "✓";
+            color: #11111b; /* crust */
+            font-size: 0.8rem;
+            font-weight: 900;
+        }
+    </style>
 </head>
-<body>
-    <div class="app-container">
-        <nav class="sidebar">
-            <div class="logo-container">
-                <img src="/static/logo.png" alt="Deku Logo" class="logo">
+<body class="bg-mantle text-text font-sans antialiased">
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <nav id="sidebar" class="w-56 bg-base p-4 border-r border-surface0 hidden md:flex flex-col">
+            <div class="flex flex-col items-center text-center mb-8 pb-4 pt-4">
+                <img src="/static/logo.png" alt="Deku Logo" class="w-16 h-16">
             </div>
-            <ul class="nav-links">
-                <li class="active"><a href="/"><i class="fas fa-list"></i> Home</a></li>
-                <li><a href="/kanban"><i class="fas fa-columns"></i> Kanban</a></li>
-                <li><a href="/gantt"><i class="fas fa-chart-gantt"></i> Gantt</a></li>
-                <li><a href="/calendar"><i class="fas fa-calendar"></i> Calendar</a></li>
+            <ul class="space-y-2">
+                <li class="bg-mauve rounded-lg"><a href="/" class="flex items-center gap-3 px-4 py-2.5 text-crust font-semibold transition-colors"><i class="fas fa-list w-5 text-center"></i> Home</a></li>
+                <li><a href="/kanban" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-subtext1 hover:bg-surface0 hover:text-text transition-colors"><i class="fas fa-columns w-5 text-center"></i> Kanban</a></li>
+                <li><a href="/calendar" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-subtext1 hover:bg-surface0 hover:text-text transition-colors"><i class="fas fa-calendar w-5 text-center"></i> Calendar</a></li>
             </ul>
-            <div id="theme-toggle" class="theme-toggle">
-                <i class="fas fa-sun"></i> Toggle theme
-            </div>
         </nav>
         
-        <main class="content">
-            <header class="content-header">
-                <div class="header-left">
-                    <button id="toggle-sidebar" class="toggle-sidebar">
+        <!-- Main Content -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+            <header class="flex items-center justify-between mb-6 pb-4 border-b border-surface0">
+                <div class="flex items-center gap-4">
+                    <button id="toggle-sidebar" class="md:hidden text-2xl text-subtext0 hover:text-text">
                         <i class="fas fa-bars"></i>
                     </button>
-                    <img src="/static/logo.png" alt="Deku Logo" class="mobile-logo">
-                    <h2>Deku</h2>
+                    <h2 class="text-2xl font-bold hidden sm:block">Deku</h2>
                 </div>
-                <div class="show-completed">
-                    <input type="checkbox" id="show-completed-checkbox">
+                <div class="flex items-center gap-2 text-subtext1">
+                    <input type="checkbox" id="show-completed-checkbox" class="w-4 h-4 rounded bg-surface1 border-surface0 text-mauve focus:ring-mauve">
                     <label for="show-completed-checkbox">Show Completed</label>
                 </div>
             </header>
             
-            <div class="content-body">
-                <div class="task-form-container">
-                    <form id="task-form" class="task-form">
-                        <input type="text" id="task-input" placeholder="Add a new task..." required>
-                        <select id="task-cycle">
-                            <option value="">No cycle</option>
-                            <option value="5m">5m</option>
-                            <option value="1h">1h</option>
-                            <option value="4h">4h</option>
-                            <option value="12h">12h</option>
-                            <option value="1d" selected>1d</option>
-                            <option value="3d">3d</option>
-                            <option value="1w">1w</option>
-                            <option value="1m">1m</option>
-                            <option value="3m">3m</option>
-                        </select>
-                        <button type="submit" class="btn-primary">Add Task</button>
-                    </form>
-                </div>
+            <div class="max-w-4xl mx-auto">
+                <form id="task-form" class="flex flex-col sm:flex-row gap-2 mb-6">
+                    <input type="text" id="task-input" placeholder="Next conquest..." required class="flex-grow bg-crust border border-surface0 rounded-lg p-1 text-text placeholder:text-subtext0 focus:outline-none focus:ring-2 focus:ring-mauve">
+                    <select id="task-cycle" class="bg-crust border border-surface0 rounded-lg p-1 text-text focus:outline-none focus:ring-2 focus:ring-mauve">
+                        <option value="">No cycle</option>
+                        <option value="1h">1h</option>
+                        <option value="4h">4h</option>
+                        <option value="12h">12h</option>
+                        <option value="1d" selected>1d</option>
+                        <option value="3d">3d</option>
+                        <option value="1w">1w</option>
+                        <option value="1m">1m</option>
+                        <option value="3m">3m</option>
+                    </select>
+                    <button type="submit" class="bg-mauve text-crust font-semibold px-3 py-1 rounded-lg hover:brightness-110 transition-all">Add Task</button>
+                </form>
                 
-                <div class="tasks-container">
-                    <ul id="tasks-list" class="tasks-list">
-                        <div class="empty-state loading">
-                          <i class="fas fa-spinner fa-spin"></i>
-                          <p>Loading tasks...</p>
-                        </div>
-                      </ul>
-                </div>
+                <ul id="tasks-list">
+                    <div class="text-center py-10 text-subtext0">
+                      <i class="fas fa-spinner fa-spin text-2xl"></i>
+                      <p class="mt-2">Loading tasks...</p>
+                    </div>
+                </ul>
             </div>
         </main>
     </div>
 
     <script src="/static/app.js"></script>
     <script>
-        // Register service worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/static/pwa/sw.js')
-                    .then(registration => {
-                        console.log('Service worker registered successfully');
-                    })
-                    .catch(error => {
-                        console.log('Service worker registration failed:', error);
-                    });
+                    .then(registration => console.log('Service worker registered successfully'))
+                    .catch(error => console.log('Service worker registration failed:', error));
             });
         }
     </script>

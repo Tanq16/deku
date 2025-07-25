@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     // DOM elements
+    const viewControls = document.getElementById('view-controls');
     const dayViewBtn = document.getElementById('day-view');
     const weekViewBtn = document.getElementById('week-view');
     const monthViewBtn = document.getElementById('month-view');
@@ -8,67 +9,53 @@ document.addEventListener('DOMContentLoaded', function() {
     const todayBtn = document.getElementById('today-btn');
     const currentPeriodEl = document.getElementById('current-period');
     const calendarView = document.getElementById('calendar-view');
+    const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+    const sidebar = document.getElementById('sidebar');
     
     // State
     let currentDate = new Date();
-    let currentView = 'month'; // Default view is month
+    let currentView = 'month'; // Default view
     
-    function updateThemeIcon() {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const icon = document.querySelector('#theme-toggle i');
-        if (icon) {
-            icon.className = currentTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-        }
-    }
-    
-    // Initialize
     init();
     
     function init() {
         setupEventListeners();
-        switchView('month'); // Explicitly set month view on load
-        updateThemeIcon();
+        loadTasksAndRender();
+        updateActiveViewButton();
     }
     
     function setupEventListeners() {
-        // View buttons
-        dayViewBtn.addEventListener('click', () => switchView('day'));
-        weekViewBtn.addEventListener('click', () => switchView('week'));
-        monthViewBtn.addEventListener('click', () => switchView('month'));
+        viewControls.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                switchView(e.target.id.replace('-view', ''));
+            }
+        });
         
-        // Navigation buttons
-        prevPeriodBtn.addEventListener('click', navigatePeriod.bind(null, -1));
-        nextPeriodBtn.addEventListener('click', navigatePeriod.bind(null, 1));
+        prevPeriodBtn.addEventListener('click', () => navigatePeriod(-1));
+        nextPeriodBtn.addEventListener('click', () => navigatePeriod(1));
         todayBtn.addEventListener('click', goToToday);
         
-        // Theme toggle (reused from app.js)
-        const themeToggle = document.getElementById('theme-toggle');
-        if (themeToggle) {
-            themeToggle.addEventListener('click', toggleTheme);
-        }
-        
-        // Mobile sidebar toggle (reused from app.js)
-        const toggleSidebar = document.getElementById('toggle-sidebar');
-        if (toggleSidebar) {
-            toggleSidebar.addEventListener('click', function() {
-                document.querySelector('.sidebar').classList.toggle('visible');
-            });
+        toggleSidebarBtn.addEventListener('click', function() {
+            sidebar.classList.toggle('hidden');
+        });
+    }
+
+    function updateActiveViewButton() {
+        [monthViewBtn, weekViewBtn, dayViewBtn].forEach(btn => {
+            btn.classList.remove('bg-mauve', 'text-crust');
+            btn.classList.add('text-subtext1', 'hover:bg-surface1');
+        });
+        const activeBtn = document.getElementById(`${currentView}-view`);
+        if (activeBtn) {
+            activeBtn.classList.add('bg-mauve', 'text-crust');
+            activeBtn.classList.remove('text-subtext1', 'hover:bg-surface1');
         }
     }
     
     function switchView(view) {
         currentView = view;
-        
-        // Update active button
-        dayViewBtn.classList.remove('active');
-        weekViewBtn.classList.remove('active');
-        monthViewBtn.classList.remove('active');
-        
-        if (view === 'day') dayViewBtn.classList.add('active');
-        else if (view === 'week') weekViewBtn.classList.add('active');
-        else monthViewBtn.classList.add('active');
-        
-        renderCalendar();
+        updateActiveViewButton();
+        loadTasksAndRender();
     }
     
     function navigatePeriod(direction) {
@@ -79,279 +66,145 @@ document.addEventListener('DOMContentLoaded', function() {
         } else { // month
             currentDate.setMonth(currentDate.getMonth() + direction);
         }
-        renderCalendar();
+        loadTasksAndRender();
     }
     
     function goToToday() {
         currentDate = new Date();
-        renderCalendar();
+        loadTasksAndRender();
     }
     
-    function renderCalendar() {
-        // Update current period display
+    function loadTasksAndRender() {
         updatePeriodDisplay();
-        
-        // Load tasks and render them on the calendar
         fetch('/api/tasks')
             .then(response => response.json())
             .then(tasks => {
                 calendarView.innerHTML = '';
-                
-                if (currentView === 'day') {
-                    renderDayView(tasks);
-                } else if (currentView === 'week') {
-                    renderWeekView(tasks);
-                } else {
-                    renderMonthView(tasks);
-                }
+                if (currentView === 'day') renderDayView(tasks || []);
+                else if (currentView === 'week') renderWeekView(tasks || []);
+                else renderMonthView(tasks || []);
             })
             .catch(error => {
                 console.error('Error loading tasks:', error);
-                calendarView.innerHTML = `
-                    <div class="error-message">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <p>Failed to load tasks</p>
-                    </div>
-                `;
+                calendarView.innerHTML = `<div class="text-center py-10 text-red"><p>Failed to load tasks</p></div>`;
             });
     }
     
     function updatePeriodDisplay() {
         if (currentView === 'day') {
-            currentPeriodEl.textContent = formatDate(currentDate, 'full');
+            currentPeriodEl.textContent = currentDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         } else if (currentView === 'week') {
             const weekStart = new Date(currentDate);
             weekStart.setDate(currentDate.getDate() - currentDate.getDay());
-            
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekStart.getDate() + 6);
-            
-            currentPeriodEl.textContent = `${formatDate(weekStart, 'short')} - ${formatDate(weekEnd, 'short')}`;
+            currentPeriodEl.textContent = `${weekStart.toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} - ${weekEnd.toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}`;
         } else { // month
-            currentPeriodEl.textContent = formatDate(currentDate, 'month');
+            currentPeriodEl.textContent = currentDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
         }
     }
     
     function renderDayView(tasks) {
         const dayStart = new Date(currentDate);
         dayStart.setHours(0, 0, 0, 0);
-        
         const dayEnd = new Date(currentDate);
         dayEnd.setHours(23, 59, 59, 999);
-        
-        // Filter tasks for this day
+
         const dayTasks = tasks.filter(task => {
             if (!task.dueAt) return false;
             const dueDate = new Date(task.dueAt);
             return dueDate >= dayStart && dueDate <= dayEnd;
-        });
-        
-        // Sort tasks by due time
-        dayTasks.sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
-        
-        // Create time slots
-        let html = `<div class="day-view">`;
-        
+        }).sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
+
+        let html = '<div class="space-y-2">';
         if (dayTasks.length === 0) {
-            html += `<div class="no-tasks">No tasks scheduled for today</div>`;
+            html += `<div class="text-center text-subtext0 py-8">No tasks scheduled for today.</div>`;
         } else {
             dayTasks.forEach(task => {
-                const dueDate = new Date(task.dueAt);
-                const timeStr = formatTime(dueDate);
-                
+                const timeStr = new Date(task.dueAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 html += `
-                    <div class="day-task ${task.completedAt ? 'completed' : ''}" title="${task.text}">
-                        <div class="day-task-time">${timeStr}</div>
-                        <div class="day-task-text">${task.text}</div>
-                    </div>
-                `;
+                    <div class="flex items-center gap-4 p-3 rounded-md ${task.completedAt ? 'bg-surface0 opacity-60' : 'bg-surface1'}">
+                        <span class="font-semibold text-mauve w-20">${timeStr}</span>
+                        <span class="truncate">${task.text}</span>
+                    </div>`;
             });
         }
-        
         html += `</div>`;
         calendarView.innerHTML = html;
     }
-    
+
     function renderWeekView(tasks) {
         const weekStart = new Date(currentDate);
         weekStart.setDate(currentDate.getDate() - currentDate.getDay());
         weekStart.setHours(0, 0, 0, 0);
-        
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        weekEnd.setHours(23, 59, 59, 999);
-        
-        // Filter tasks for this week
-        const weekTasks = tasks.filter(task => {
-            if (!task.dueAt) return false;
-            const dueDate = new Date(task.dueAt);
-            return dueDate >= weekStart && dueDate <= weekEnd;
-        });
-        
-        // Group tasks by day
-        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        let html = `<div class="week-view">`;
-        
+
+        let html = `<div class="grid grid-cols-1 md:grid-cols-7 gap-2">`;
+        const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
         for (let i = 0; i < 7; i++) {
             const dayDate = new Date(weekStart);
             dayDate.setDate(weekStart.getDate() + i);
-            
-            const dayTasks = weekTasks.filter(task => {
+            const dayStart = new Date(dayDate);
+            const dayEnd = new Date(dayDate);
+            dayEnd.setHours(23, 59, 59, 999);
+
+            const dayTasks = tasks.filter(task => {
+                if (!task.dueAt) return false;
                 const dueDate = new Date(task.dueAt);
-                return dueDate.getDay() === dayDate.getDay();
-            });
+                return dueDate >= dayStart && dueDate <= dayEnd;
+            }).sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
             
-            html += `
-                <div class="week-day">
-                    <div class="week-day-header">${days[i]} (${dayDate.getDate()})</div>
-                    <div class="week-day-tasks">
-                        ${dayTasks.length === 0 ? 
-                            '<div class="no-tasks">No tasks</div>' : 
-                            dayTasks.map(task => `
-                                <div class="week-task ${task.completedAt ? 'completed' : ''}" title="${task.text}">
-                                    <div class="week-task-time">${formatTime(new Date(task.dueAt))}</div>
-                                    <div class="week-task-text">${task.text}</div>
-                                </div>
-                            `).join('')}
-                    </div>
+            html += `<div class="bg-crust rounded-lg p-2">
+                <div class="text-center font-bold text-sm mb-2">${weekdays[i]} ${dayDate.getDate()}</div>
+                <div class="space-y-1.5">
+                    ${dayTasks.length === 0 ? '<div class="text-center text-xs text-subtext0 pt-2">...</div>' : dayTasks.map(task => `
+                        <div title="${task.text}" class="p-1.5 rounded text-xs truncate ${task.completedAt ? 'bg-surface0/50 text-subtext0' : 'bg-blue text-crust'}">
+                            ${task.text}
+                        </div>
+                    `).join('')}
                 </div>
-            `;
+            </div>`;
         }
-        
         html += `</div>`;
         calendarView.innerHTML = html;
     }
-    
+
     function renderMonthView(tasks) {
         const year = currentDate.getFullYear();
         const month = currentDate.getMonth();
-        
-        // Get first day of month (0-6, Sunday-Saturday)
         const firstDay = new Date(year, month, 1).getDay();
-        
-        // Get number of days in month
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         
-        // Get number of days from previous month to show
-        const daysFromPrevMonth = firstDay;
-        
-        // Get number of days from next month to show (to complete the grid)
-        const totalCells = Math.ceil((daysInMonth + daysFromPrevMonth) / 7) * 7;
-        const daysFromNextMonth = totalCells - daysInMonth - daysFromPrevMonth;
-        
-        // Create date ranges for filtering tasks
-        const monthStart = new Date(year, month, 1);
-        const monthEnd = new Date(year, month + 1, 0);
-        monthEnd.setHours(23, 59, 59, 999);
-        
-        // Filter tasks for this month
-        const monthTasks = tasks.filter(task => {
-            if (!task.dueAt) return false;
-            const dueDate = new Date(task.dueAt);
-            return dueDate >= monthStart && dueDate <= monthEnd;
-        });
-        
-        // Group tasks by day
-        const tasksByDay = {};
-        monthTasks.forEach(task => {
-            const dueDate = new Date(task.dueAt);
-            const day = dueDate.getDate();
-            
-            if (!tasksByDay[day]) {
-                tasksByDay[day] = [];
-            }
-            tasksByDay[day].push(task);
-        });
-        
-        // Create calendar grid
-        let html = `<div class="month-view">`;
-        
-        // Weekday headers
+        let html = `<div class="grid grid-cols-7 gap-1 text-sm">`;
         const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        html += `<div class="month-weekdays">`;
-        weekdays.forEach(day => {
-            html += `<div class="month-weekday">${day}</div>`;
-        });
-        html += `</div>`;
-        
-        // Days grid
-        html += `<div class="month-days">`;
-        
-        // Days from previous month (grayed out)
-        const prevMonthLastDay = new Date(year, month, 0).getDate();
-        for (let i = daysFromPrevMonth - 1; i >= 0; i--) {
-            const day = prevMonthLastDay - i;
-            html += `<div class="month-day other-month">${day}</div>`;
+        html += weekdays.map(day => `<div class="font-bold text-center p-2 text-subtext0">${day}</div>`).join('');
+
+        for (let i = 0; i < firstDay; i++) {
+            html += `<div></div>`;
         }
-        
-        // Days of current month
+
         const today = new Date();
         for (let day = 1; day <= daysInMonth; day++) {
-            const hasTasks = tasksByDay[day] && tasksByDay[day].length > 0;
-            const isToday = today.getFullYear() === year && 
-                            today.getMonth() === month && 
-                            today.getDate() === day;
+            const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+            const dayDate = new Date(year, month, day);
+            const dayTasks = tasks.filter(task => {
+                if (!task.dueAt) return false;
+                const dueDate = new Date(task.dueAt);
+                return dueDate.getFullYear() === year && dueDate.getMonth() === month && dueDate.getDate() === day;
+            });
             
-            html += `
-                <div class="month-day ${isToday ? 'today' : ''}">
-                    <div class="month-day-number">${day}</div>
-                    ${hasTasks ? 
-                        `<div class="month-day-tasks">
-                            ${tasksByDay[day].map(task => `
-                                <div class="month-task ${task.completedAt ? 'completed' : ''}" 
-                                    title="${formatTime(new Date(task.dueAt))} - ${task.text}">
-                                    ${formatTime(new Date(task.dueAt))} ${task.text.length > 15 ? task.text.substring(0, 15) + '...' : task.text}
-                                </div>
-                            `).join('')}
-                        </div>` : ''}
+            html += `<div class="h-28 bg-crust rounded p-1.5 flex flex-col overflow-hidden ${isToday ? 'border-2 border-mauve' : ''}">
+                <div class="font-semibold ${isToday ? 'text-mauve' : ''}">${day}</div>
+                <div class="space-y-1 mt-1 overflow-y-auto">
+                    ${dayTasks.map(task => `
+                        <div title="${task.text}" class="p-1 rounded text-xs truncate ${task.completedAt ? 'bg-surface0/50 text-subtext0' : 'bg-sky text-crust'}">
+                            ${task.text}
+                        </div>
+                    `).join('')}
                 </div>
-            `;
+            </div>`;
         }
-        
-        // Days from next month (grayed out)
-        for (let day = 1; day <= daysFromNextMonth; day++) {
-            html += `<div class="month-day other-month">${day}</div>`;
-        }
-        
-        html += `</div></div>`;
+        html += `</div>`;
         calendarView.innerHTML = html;
-    }
-    
-    // Helper functions
-    function formatDate(date, format) {
-        const options = {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        };
-        
-        if (format === 'short') {
-            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-        } else if (format === 'month') {
-            return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
-        } else { // full
-            return date.toLocaleDateString(undefined, options);
-        }
-    }
-    
-    function formatTime(date) {
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-    
-    // Reused from app.js
-    function toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('theme', newTheme);
-        updateThemeIcon();
-        
-        // Also update the icon in the sidebar if it exists
-        const sidebarIcon = document.querySelector('.sidebar #theme-toggle i');
-        if (sidebarIcon) {
-            sidebarIcon.className = newTheme === 'dark' ? 'fas fa-moon' : 'fas fa-sun';
-        }
     }
 });

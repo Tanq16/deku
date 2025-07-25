@@ -1,61 +1,103 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Deku - Calendar View</title>
-    <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" href="/static/logo.png" type="image/svg+xml">
     <link rel="stylesheet" href="/static/fontawesome/css/all.min.css">
+    <link href="/css/inter.css" rel="stylesheet">
+    <script src="/static/js/tailwindcss.js"></script>
     <script>
-        // Apply theme immediately to prevent flash of wrong theme
-        document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+        tailwind.config = {
+          darkMode: 'class',
+          theme: {
+            extend: {
+              fontFamily: {
+                sans: ['Inter', 'sans-serif'],
+              },
+              colors: {
+                // Catppuccin Mocha Palette
+                rosewater: '#f5e0dc',
+                flamingo: '#f2cdcd',
+                pink: '#f5c2e7',
+                mauve: '#cba6f7',
+                red: '#f38ba8',
+                maroon: '#eba0ac',
+                peach: '#fab387',
+                yellow: '#f9e2af',
+                green: '#a6e3a1',
+                teal: '#94e2d5',
+                sky: '#89dceb',
+                sapphire: '#74c7ec',
+                blue: '#89b4fa',
+                lavender: '#b4befe',
+                text: '#cdd6f4',
+                subtext1: '#bac2de',
+                subtext0: '#a6adc8',
+                overlay2: '#9399b2',
+                overlay1: '#7f849c',
+                overlay0: '#6c7086',
+                surface2: '#585b70',
+                surface1: '#45475a',
+                surface0: '#313244',
+                base: '#1e1e2e',
+                mantle: '#181825',
+                crust: '#11111b'
+              }
+            }
+          }
+        }
     </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #11111b; } /* crust */
+        ::-webkit-scrollbar-thumb { background: #313244; border-radius: 4px; } /* surface0 */
+        ::-webkit-scrollbar-thumb:hover { background: #45475a; } /* surface1 */
+    </style>
 </head>
-<body>
-    <div class="app-container">
-        <nav class="sidebar">
-            <div class="logo-container">
-                <img src="/static/logo.png" alt="Deku Logo" class="logo">
+<body class="bg-mantle text-text font-sans antialiased">
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <nav id="sidebar" class="w-56 bg-base p-4 border-r border-surface0 hidden md:flex flex-col">
+            <div class="flex flex-col items-center text-center mb-8 pb-4 pt-4">
+                <img src="/static/logo.png" alt="Deku Logo" class="w-16 h-16">
             </div>
-            <ul class="nav-links">
-                <li><a href="/"><i class="fas fa-list"></i> Home</a></li>
-                <li><a href="/kanban"><i class="fas fa-columns"></i> Kanban</a></li>
-                <li><a href="/gantt"><i class="fas fa-chart-gantt"></i> Gantt</a></li>
-                <li class="active"><a href="/calendar"><i class="fas fa-calendar"></i> Calendar</a></li>
+            <ul class="space-y-2">
+                <li><a href="/" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-subtext1 hover:bg-surface0 hover:text-text transition-colors"><i class="fas fa-list w-5 text-center"></i> Home</a></li>
+                <li><a href="/kanban" class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-subtext1 hover:bg-surface0 hover:text-text transition-colors"><i class="fas fa-columns w-5 text-center"></i> Kanban</a></li>
+                <li class="bg-mauve rounded-lg"><a href="/calendar" class="flex items-center gap-3 px-4 py-2.5 text-crust font-semibold transition-colors"><i class="fas fa-calendar w-5 text-center"></i> Calendar</a></li>
             </ul>
-            <div id="theme-toggle" class="theme-toggle">
-                <i class="fas fa-sun"></i> Toggle theme
-            </div>
         </nav>
         
-        <main class="content">
-            <header class="content-header">
-                <button id="toggle-sidebar" class="toggle-sidebar">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <h2>Calendar</h2>
-                <div class="calendar-view-controls">
-                    <button id="month-view" class="btn-primary">Month</button>
-                    <button id="week-view" class="btn-primary">Week</button>
-                    <button id="day-view" class="btn-primary">Day</button>
+        <!-- Main Content -->
+        <main class="flex-1 p-4 sm:p-6 lg:p-8 flex flex-col">
+            <header class="flex items-center justify-between mb-6 pb-4 border-b border-surface0">
+                <div class="flex items-center gap-4">
+                    <button id="toggle-sidebar" class="md:hidden text-2xl text-subtext0 hover:text-text">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h2 class="text-2xl font-bold">Calendar</h2>
+                </div>
+                <div id="view-controls" class="hidden sm:flex items-center gap-2 p-1 bg-crust rounded-lg">
+                    <button id="month-view" class="px-3 py-1.5 text-sm font-semibold rounded-md transition-colors">Month</button>
+                    <button id="week-view" class="px-3 py-1.5 text-sm font-semibold rounded-md transition-colors">Week</button>
+                    <button id="day-view" class="px-3 py-1.5 text-sm font-semibold rounded-md transition-colors">Day</button>
                 </div>
             </header>
             
-            <div class="content-body">
-                <div class="calendar-header">
-                    <button id="prev-period"><i class="fas fa-chevron-left"></i></button>
-                    <h3 id="current-period">May 2025</h3>
-                    <button id="next-period"><i class="fas fa-chevron-right"></i></button>
-                    <button id="today-btn" class="btn-primary">Today</button>
-                </div>
-                
-                <div id="calendar-view">
-                    <!-- Calendar content will be rendered here -->
-                    <div class="loading-calendar">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        <p>Loading calendar...</p>
-                    </div>
+            <div class="flex items-center justify-center gap-4 mb-4">
+                <button id="prev-period" class="p-2 rounded-md hover:bg-surface0"><i class="fas fa-chevron-left"></i></button>
+                <h3 id="current-period" class="text-xl font-semibold w-48 text-center">Loading...</h3>
+                <button id="next-period" class="p-2 rounded-md hover:bg-surface0"><i class="fas fa-chevron-right"></i></button>
+                <button id="today-btn" class="bg-surface0 text-subtext1 font-semibold px-4 py-2 rounded-lg hover:bg-surface1 hover:text-text transition-colors">Today</button>
+            </div>
+            
+            <div id="calendar-view" class="flex-grow bg-base p-1 rounded-lg">
+                <div class="text-center py-10 text-subtext0">
+                  <i class="fas fa-spinner fa-spin text-2xl"></i>
+                  <p class="mt-2">Loading calendar...</p>
                 </div>
             </div>
         </main>
