@@ -353,7 +353,7 @@ func checkAndSendNotifications(store *TaskStore, notificationURL string) {
 
 func startNotificationScheduler(store *TaskStore, notificationURL string) {
 	log.Printf("Notification scheduler URL: %s", notificationURL)
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(4 * time.Minute)
 	defer ticker.Stop()
 	// run once
 	checkAndSendNotifications(store, notificationURL)
