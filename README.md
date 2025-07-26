@@ -76,6 +76,9 @@ services:
          - NOTIFICATION=https://DISCORD_URL_HERE
 ```
 
+> [!NOTE]
+> When `NOTIFICATION` environment variable is not provided, Deku uses `http://nottif:8080/api/send`. This setting only works when the [Nottif](https://github.com/tanq16/nottif) project is set up within the same Docker network, making it reachable via the container name and port of `nottif:8080`.
+
 ### Binary Installation
 
 Download the appropriate binary for your system from the [latest release](https://github.com/tanq16/deku/releases/latest).

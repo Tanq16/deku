@@ -314,7 +314,11 @@ func notifyClients() {
 
 func sendNotification(task *Task, notificationURL string) {
 	message := fmt.Sprintf("Task Due: %s", task.Text)
-	payload := map[string]string{"content": message}
+	payload := map[string]string{
+		"username":   "Deku",
+		"content":    message,
+		"avatar_url": "https://raw.githubusercontent.com/Tanq16/deku/refs/heads/main/static/pwa/icons/icon-512x512.png",
+	}
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		log.Printf("Error marshalling notification payload: %v", err)
@@ -370,7 +374,7 @@ func main() {
 	if notificationSetting == "disable" {
 		log.Println("Notifications are disabled via env var")
 	} else {
-		notificationURL := "http://nottif:8080/api/notify" // Default for Nottif in network
+		notificationURL := "http://nottif:8080/api/send" // Default to Nottif in network
 		if notificationSetting != "" {
 			notificationURL = notificationSetting
 		}
